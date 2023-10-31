@@ -13,5 +13,9 @@ construct_uint! {
 #[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)]
 pub enum StorageKey {
     ClaimableSoldTokens { hash_id: CryptoHash },
-    Buyer { hash_id: CryptoHash }
+    BuyerActiveSales { hash_id: CryptoHash },
+    ActivesSales,
+    Buyers,
+    Sales,
+    SalesById,
 }

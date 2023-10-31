@@ -12,7 +12,7 @@ impl Buyer {
     pub fn new(id: &AccountId) -> Self {
         Self {
             active_sales: UnorderedSet::new(
-                StorageKey::Buyer {
+                StorageKey::BuyerActiveSales {
                     hash_id: generate_hash_id(id.to_string())
                 }
             ),
