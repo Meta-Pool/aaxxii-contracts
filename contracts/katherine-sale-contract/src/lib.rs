@@ -20,7 +20,7 @@ mod utils;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
-pub struct KatherineSale {
+pub struct KatherineSaleContract {
     pub owner_id: AccountId,
     pub buyers: UnorderedMap<AccountId, Buyer>,
     pub sales: Vector<Sale>,
@@ -43,7 +43,7 @@ pub struct KatherineSale {
 }
 
 #[near_bindgen]
-impl KatherineSale {
+impl KatherineSaleContract {
     #[init]
     pub fn new(
         owner_id: AccountId,
@@ -176,3 +176,7 @@ impl KatherineSale {
         self.process_payment_tokens_deposit(&buyer_id, amount, &mut sale);
     }
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg(test)]
+mod tests;

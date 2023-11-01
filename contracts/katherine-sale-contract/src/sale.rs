@@ -173,7 +173,7 @@ impl Sale {
 }
 
 // #[near_bindgen]
-impl KatherineSale {
+impl KatherineSaleContract {
     pub(crate) fn assert_unique_slug(&self, slug: &String) {
         assert!(
             self.sale_id_by_slug.get(slug).is_none(),

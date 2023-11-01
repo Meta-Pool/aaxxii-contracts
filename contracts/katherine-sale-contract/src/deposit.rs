@@ -4,7 +4,7 @@ use near_sdk::json_types::U128;
 use near_sdk::{env, log, near_bindgen, PromiseOrValue, require};
 
 #[near_bindgen]
-impl FungibleTokenReceiver for KatherineSale {
+impl FungibleTokenReceiver for KatherineSaleContract {
 
     // *********************
     // * Payments using FT *
@@ -53,7 +53,7 @@ impl FungibleTokenReceiver for KatherineSale {
     }
 }
 
-impl KatherineSale {
+impl KatherineSaleContract {
     /// Process a payment deposit.
     /// This function should be able to process NEAR and payment token.
     pub(crate) fn process_payment_tokens_deposit(

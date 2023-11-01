@@ -29,7 +29,7 @@ impl Buyer {
     }
 }
 
-impl KatherineSale {
+impl KatherineSaleContract {
     /// Inner method to get the given buyer or a new default value buyer.
     pub(crate) fn internal_get_buyer(
         &self,
