@@ -5,6 +5,11 @@ use near_sdk::{env, log, near_bindgen, PromiseOrValue, require};
 
 #[near_bindgen]
 impl FungibleTokenReceiver for KatherineSale {
+
+    // *********************
+    // * Payments using FT *
+    // *********************
+
     fn ft_on_transfer(
         &mut self,
         sender_id: AccountId,
@@ -29,10 +34,9 @@ impl FungibleTokenReceiver for KatherineSale {
             );
 
         // Deposit of a payment token.
-        } else if sale.payment_token_contract_address.is_some()
-                && sale.payment_token_contract_address.unwrap() == env::predecessor_account_id() {
-            self.assert_min_deposit_amount(amount);
-        // self.process_sold_tokens_deposit(sender_id.as_ref(), &amount, &mut kickstarter);
+        } else if sale.payment_config.payment_token_contract_address.is_some()
+                && sale.payment_config.payment_token_contract_address.as_ref().unwrap() == &env::predecessor_account_id() {
+            self.process_payment_tokens_deposit(&sender_id, amount, &mut sale);
             log!(
                 "DEPOSIT: {} payment tokens deposited from {} to sale {}",
                 amount,
@@ -43,61 +47,43 @@ impl FungibleTokenReceiver for KatherineSale {
         } else {
             panic!("Unknown token {} for sale {}", env::predecessor_account_id(), &msg);
         }
-            
-            
-            
-        //     if env::predecessor_account_id() == sale.sold_token_contract_address {
-        //     // self.assert_min_deposit_amount(amount);
-        //     log!(
-        //         "DEPOSIT: {} sold tokens deposited from {} to sale {}",
-        //         amount,
-        //         &sender_id,
-        //         &msg
-        //     );
-        //     // self.process_kickstarter_deposit(amount, &mut kickstarter);
-        // } else {
-        //     panic!("Unknown token {} for sale {}", env::predecessor_account_id(), &msg);
-        // }
+
         // Return unused amount
         PromiseOrValue::Value(U128::from(0))
     }
 }
 
 impl KatherineSale {
-    fn assert_min_deposit_amount(&self, amount: Balance) {
-        assert!(
-            amount >= self.min_deposit_amount,
-            "minimum deposit amount is {}",
-            self.min_deposit_amount
+    /// Process a payment deposit.
+    /// This function should be able to process NEAR and payment token.
+    pub(crate) fn process_payment_tokens_deposit(
+        &mut self,
+        buyer_id: &AccountId,
+        amount: Balance,
+        sale: &mut Sale,
+    ) {
+        sale.assert_min_deposit_amount(amount);
+        sale.assert_within_funding_period();
+
+        // For the payment token.
+        sale.total_payment_token += amount;
+        let sold_tokens = sale.from_payment_to_sold_token(amount);
+
+        // For the sold token.
+        let new_amount = sale.get_claimable_sold_token_for_buyers(buyer_id) + sold_tokens;
+        sale.claimable_sold_token_for_buyers.insert(buyer_id, &new_amount);
+        sale.required_sold_token += new_amount;
+        require!(
+            sale.required_sold_token <= sale.max_available_sold_token,
+            "Not enough token for sale."
         );
+
+        // Update Sale and Buyer
+        self.sales.replace(sale.id as u64, &sale);
+        let mut buyer = self.internal_get_buyer(&buyer_id);
+        buyer.active_sales.insert(&sale.id);
+        self.buyers.insert(&buyer_id, &buyer);
     }
-
-    // /// Process a stNEAR deposit to Katherine Contract.
-    // fn process_supporter_deposit(
-    //     &mut self,
-    //     supporter_id: &AccountId,
-    //     amount: &Balance,
-    //     kickstarter: &mut Kickstarter,
-    // ) {
-    //     // Update Kickstarter
-    //     kickstarter.assert_within_funding_period();
-    //     kickstarter.assert_enough_reward_tokens();
-
-    //     let new_total_deposited = kickstarter.total_deposited + amount;
-    //     assert!(
-    //         new_total_deposited <= kickstarter.deposits_hard_cap,
-    //         "The deposits hard cap cannot be exceeded!"
-    //     );
-    //     kickstarter.total_deposited = new_total_deposited;
-    //     kickstarter.update_supporter_deposits(&supporter_id, amount);
-    //     self.kickstarters
-    //         .replace(kickstarter.id as u64, &kickstarter);
-
-    //     // Update Supporter.
-    //     let mut supporter = self.internal_get_supporter(&supporter_id);
-    //     supporter.supported_projects.insert(&kickstarter.id);
-    //     self.supporters.insert(&supporter_id, &supporter);
-    // }
 
     /// Process the tokens that are going to be sold.
     fn process_sold_tokens_deposit(
@@ -117,7 +103,6 @@ impl KatherineSale {
         // kickstarter.enough_reward_tokens = {
         //     kickstarter.available_reward_tokens >= min_tokens_to_allow_support
         // };
-        self.sales
-            .replace(sale.id as u64, &sale);
+        self.sales.replace(sale.id as u64, &sale);
     }
 }

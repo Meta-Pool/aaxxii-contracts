@@ -9,7 +9,7 @@ pub struct Buyer {
 }
 
 impl Buyer {
-    pub fn new(id: &AccountId) -> Self {
+    pub(crate) fn new(id: &AccountId) -> Self {
         Self {
             active_sales: UnorderedSet::new(
                 StorageKey::BuyerActiveSales {
@@ -19,12 +19,12 @@ impl Buyer {
         }
     }
 
-    pub fn in_sale(&self, sale_id: u32) -> bool {
+    pub(crate) fn in_sale(&self, sale_id: u32) -> bool {
         return self.active_sales.contains(&sale_id)
     }
 
     /// When the buyer.is_empty() it will be removed.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         return self.active_sales.is_empty();
     }
 }
