@@ -18,6 +18,8 @@ mod sale;
 mod types;
 mod utils;
 
+/// Time in this contract is measured in Milliseconds.
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct KatherineSaleContract {
@@ -114,11 +116,11 @@ impl KatherineSaleContract {
         is_in_near: bool,
         sold_token_contract_address: AccountId,
         // "one" references the payment token UNIT
-        one_payment_token_purchase_rate: u128,
-        max_available_sold_token: Balance,
-        open_date_timestamp: EpochMillis,
-        close_date_timestamp: EpochMillis,
-        release_date_timestamp: EpochMillis,
+        one_payment_token_purchase_rate: U128,
+        max_available_sold_token: U128,
+        open_date_timestamp: U64,
+        close_date_timestamp: U64,
+        release_date_timestamp: U64,
     ) -> u32 {
         self.assert_only_owner();
         self.assert_unique_slug(&slug);
@@ -143,11 +145,11 @@ impl KatherineSaleContract {
             id,
             slug,
             sold_token_contract_address,
-            one_payment_token_purchase_rate,
-            max_available_sold_token,
-            open_date_timestamp,
-            close_date_timestamp,
-            release_date_timestamp,
+            one_payment_token_purchase_rate.0,
+            max_available_sold_token.0,
+            open_date_timestamp.0,
+            close_date_timestamp.0,
+            release_date_timestamp.0,
             min_deposit_amount,
             payment_token_contract_address,
             payment_token_unit,
@@ -174,6 +176,23 @@ impl KatherineSaleContract {
 
         require!(sale.is_near_accepted());
         self.process_payment_tokens_deposit(&buyer_id, amount, &mut sale);
+    }
+
+    // ********
+    // * View *
+    // ********
+
+    pub fn get_number_of_sales(&self) -> u32 {
+        self.sales.len().try_into().unwrap()
+    }
+
+    pub fn get_claimable_sold_token_for_buyers(
+        &self,
+        buyer_id: AccountId,
+        sale_id: u32
+    ) -> U128 {
+        let sale = self.internal_get_sale(sale_id);
+        U128::from(sale.get_claimable_sold_token_for_buyers(&buyer_id))
     }
 }
 
