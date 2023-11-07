@@ -35,7 +35,9 @@ fn create_sale(
     slug: &str,
     is_in_near: bool
 ) {
-    let unit = if is_in_near {NEAR} else {USDT_UNIT};
+    // let unit = if is_in_near {NEAR} else {USDT_UNIT};
+    let unit = NEAR;
+    // We'll assume that the  sold token will always have 24 decimals
     contract.create_sale(
         // slug: String,
         String::from(slug),
@@ -101,6 +103,7 @@ fn test_near_deposit() {
     assert_eq!(6 * NEAR, contract.get_claimable_sold_token_for_buyers(accounts(1), 0).0);
     assert_eq!(6 * NEAR, contract.sales.get(0).unwrap().required_sold_token);
     assert_eq!(3 * NEAR, contract.sales.get(0).unwrap().total_payment_token);
+    assert_eq!(0, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
 
     testing_env!(context
         .predecessor_account_id(accounts(2))
@@ -115,6 +118,70 @@ fn test_near_deposit() {
     assert_eq!(2 * NEAR, contract.get_claimable_sold_token_for_buyers(accounts(2), 0).0);
     assert_eq!(8 * NEAR, contract.sales.get(0).unwrap().required_sold_token);
     assert_eq!(4 * NEAR, contract.sales.get(0).unwrap().total_payment_token);
+
+    testing_env!(context
+        .predecessor_account_id(sold_token_contract())
+        .is_view(false)
+        // .attached_deposit(1 * NEAR)
+        .block_timestamp(to_ts(1))
+        .build()
+    );
+    contract.ft_on_transfer(accounts(3), U128::from(8 * NEAR), 0.to_string());
+    assert_eq!(8 * NEAR, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
+}
+
+#[test]
+fn test_usdt_deposit() {
+    let mut context = get_context(owner_account());
+    testing_env!(context.build());
+    let mut contract = new_katherine_contract();
+
+    testing_env!(context
+        .predecessor_account_id(owner_account())
+        .attached_deposit(STORAGE_PER_SALE)
+        .build()
+    );
+    create_sale(&mut contract, "test-sale-1", false);
+
+    testing_env!(context
+        // .predecessor_account_id(accounts(1))
+        .predecessor_account_id(usdt_token_contract())
+        // .attached_deposit(3 * NEAR)
+        .block_timestamp(to_ts(0))
+        .build()
+    );
+    contract.ft_on_transfer(accounts(1), U128::from(4 * USDT_UNIT), 0.to_string());
+
+    testing_env!(context.is_view(true).build());
+    assert_eq!(8 * NEAR, contract.get_claimable_sold_token_for_buyers(accounts(1), 0).0);
+    assert_eq!(8 * NEAR, contract.sales.get(0).unwrap().required_sold_token);
+    assert_eq!(4 * USDT_UNIT, contract.sales.get(0).unwrap().total_payment_token);
+    assert_eq!(0, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
+
+    testing_env!(context
+        // .predecessor_account_id(accounts(2))
+        .predecessor_account_id(usdt_token_contract())
+        .is_view(false)
+        // .attached_deposit(1 * NEAR)
+        .block_timestamp(to_ts(1))
+        .build()
+    );
+    contract.ft_on_transfer(accounts(2), U128::from(1 * USDT_UNIT), 0.to_string());
+
+    testing_env!(context.is_view(true).build());
+    assert_eq!(2 * NEAR, contract.get_claimable_sold_token_for_buyers(accounts(2), 0).0);
+    assert_eq!(10 * NEAR, contract.sales.get(0).unwrap().required_sold_token);
+    assert_eq!(5 * USDT_UNIT, contract.sales.get(0).unwrap().total_payment_token);
+
+    testing_env!(context
+        .predecessor_account_id(sold_token_contract())
+        .is_view(false)
+        // .attached_deposit(1 * NEAR)
+        .block_timestamp(to_ts(1))
+        .build()
+    );
+    contract.ft_on_transfer(accounts(3), U128::from(10 * NEAR), 0.to_string());
+    assert_eq!(10 * NEAR, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
 }
 
 #[test]
