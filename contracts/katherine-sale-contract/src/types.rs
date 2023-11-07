@@ -14,6 +14,7 @@ construct_uint! {
 pub enum StorageKey {
     ClaimableSoldTokens { hash_id: CryptoHash },
     BuyerActiveSales { hash_id: CryptoHash },
+    Deposits { hash_id: CryptoHash },
     ActivesSales,
     Buyers,
     Sales,

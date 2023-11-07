@@ -1,7 +1,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet, Vector};
 use near_sdk::json_types::{U128, U64};
-use near_sdk::{require, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, PromiseResult};
+use near_sdk::{require, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, PromiseResult, Promise};
 use std::convert::TryInto;
 
 use crate::buyer::*;
@@ -9,14 +9,17 @@ use crate::constants::*;
 use crate::sale::*;
 use crate::types::*;
 use crate::utils::*;
+use crate::interface::*;
 
 mod buyer;
 mod constants;
 mod deposit;
+mod interface;
 mod internal;
 mod sale;
 mod types;
 mod utils;
+mod withdraw;
 
 /// Time in this contract is measured in Milliseconds.
 
@@ -178,6 +181,38 @@ impl KatherineSaleContract {
         self.process_payment_tokens_deposit(&buyer_id, amount, &mut sale);
     }
 
+    // ************************
+    // * Withdraw Sold Tokens *
+    // ************************
+
+    pub fn withdraw_sold_tokens(&mut self, sale_id: u32) -> Promise {
+        let buyer_id = env::predecessor_account_id();
+        let mut sale = self.internal_get_sale(sale_id);
+
+        sale.assert_after_release_period();
+        if sale.are_sold_tokens_covered() {
+            let amount = sale.get_claimable_sold_token_for_buyers(&buyer_id);
+            require!(amount > 0);
+            self.internal_buyer_withdraw_sold_tokens(
+                buyer_id,
+                U128::from(amount),
+                &mut sale
+            )
+        } else {
+            let amount = sale.get_deposits(&buyer_id);
+            require!(amount > 0);
+            self.internal_buyer_withdraw_payment_token(
+                buyer_id,
+                U128::from(amount),
+                &mut sale
+            )
+        }
+    }
+
+    pub fn withdraw_excess_sold_tokens(&mut self, sale_id: u32) {
+
+    }
+
     // ********
     // * View *
     // ********
@@ -193,6 +228,11 @@ impl KatherineSaleContract {
     ) -> U128 {
         let sale = self.internal_get_sale(sale_id);
         U128::from(sale.get_claimable_sold_token_for_buyers(&buyer_id))
+    }
+
+    pub fn get_deposits(&self, buyer_id: AccountId, sale_id: u32) -> U128 {
+        let sale = self.internal_get_sale(sale_id);
+        U128::from(sale.get_deposits(&buyer_id))
     }
 }
 

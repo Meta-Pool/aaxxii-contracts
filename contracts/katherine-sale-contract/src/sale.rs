@@ -54,6 +54,7 @@ pub struct Sale {
     /// Consider that the sold token was converted form NEAR or payment token.
     /// The sum of the balances should be equal to required_sold_token.
     pub claimable_sold_token_for_buyers: UnorderedMap<AccountId, Balance>,
+    pub deposits: UnorderedMap<AccountId, Balance>,
 
     /// The payment config is inherit when sale is created.
     pub payment_config: PaymentConfig,
@@ -92,6 +93,11 @@ impl Sale {
                     hash_id: generate_hash_id(id.to_string())
                 }
             ),
+            deposits: UnorderedMap::new(
+                StorageKey::Deposits {
+                    hash_id: generate_hash_id(id.to_string())
+                }
+            ),
             payment_config: PaymentConfig {
                 min_deposit_amount,
                 payment_token_contract_address,
@@ -113,7 +119,17 @@ impl Sale {
         &self,
         buyer_id: &AccountId
     ) -> Balance {
-        match self.claimable_sold_token_for_buyers.get(&buyer_id) {
+        match self.claimable_sold_token_for_buyers.get(buyer_id) {
+            Some(amount) => amount,
+            None => 0,
+        }
+    }
+
+    pub(crate) fn get_deposits(
+        &self,
+        buyer_id: &AccountId
+    ) -> Balance {
+        match self.deposits.get(buyer_id) {
             Some(amount) => amount,
             None => 0,
         }
@@ -132,14 +148,6 @@ impl Sale {
             amount,
             self.one_payment_token_purchase_rate,
             self.payment_config.payment_token_unit
-        )
-    }
-
-    pub(crate) fn from_sold_to_payment_token(&self, amount: u128) -> u128 {
-        proportional(
-            amount,
-            self.payment_config.payment_token_unit,
-            self.one_payment_token_purchase_rate
         )
     }
 
@@ -166,9 +174,18 @@ impl Sale {
         );
     }
 
+    #[inline]
+    pub(crate) fn assert_after_release_period(&self) {
+        require!(get_current_epoch_millis() >= self.release_date_timestamp);
+    }
+
     pub(crate) fn is_within_funding_period(&self) -> bool {
         let now = get_current_epoch_millis();
         now < self.close_date_timestamp && now >= self.open_date_timestamp
+    }
+
+    pub(crate) fn are_sold_tokens_covered(&self) -> bool {
+        self.required_sold_token <= self.sold_tokens_for_buyers
     }
 }
 
