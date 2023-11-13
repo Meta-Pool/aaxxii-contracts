@@ -181,11 +181,11 @@ impl KatherineSaleContract {
         self.process_payment_tokens_deposit(&buyer_id, amount, &mut sale);
     }
 
-    // ************************
-    // * Withdraw Sold Tokens *
-    // ************************
+    // *******************
+    // * Buyers Withdraw *
+    // *******************
 
-    pub fn withdraw_sold_tokens(&mut self, sale_id: u32) -> Promise {
+    pub fn withdraw_tokens(&mut self, sale_id: u32) -> Promise {
         let buyer_id = env::predecessor_account_id();
         let mut sale = self.internal_get_sale(sale_id);
 
@@ -209,7 +209,9 @@ impl KatherineSaleContract {
         }
     }
 
-    pub fn withdraw_excess_sold_tokens(&mut self, sale_id: u32) {
+    pub fn withdraw_excess_sold_tokens(&mut self, sale_id: u32) -> Promise {
+        // Only after the close date.
+        unimplemented!();
 
     }
 
