@@ -26,7 +26,7 @@ pub struct Sale {
     pub sold_token_contract_address: AccountId,
 
     /// For the **buyers**
-    pub max_available_sold_token: Balance,
+    pub max_available_sold_token: Balance, // Remains constant.
     pub required_sold_token: Balance,
 
     /// For the **seller**
@@ -44,16 +44,17 @@ pub struct Sale {
     pub close_date_timestamp: EpochMillis,
 
     /// Date when the sold tokens will be released for claim.
-    /// IMPORTANT: Limit date for depositing the sold_tokens_for_buyers
+    /// IMPORTANT: Limit date for depositing the `sold_tokens_for_buyers`.
     pub release_date_timestamp: EpochMillis,
 
-    /// If sold_tokens_for_buyers < required_sold_token, by release_date
+    /// If `sold_tokens_for_buyers` < `required_sold_token`, by release_date
     /// then buyers can claim the payment tokens.
     pub sold_tokens_for_buyers: Balance,
 
     /// Consider that the sold token was converted form NEAR or payment token.
-    /// The sum of the balances should be equal to required_sold_token.
+    /// The sum of the balances should be equal to `required_sold_token`.
     pub claimable_sold_token_for_buyers: UnorderedMap<AccountId, Balance>,
+    /// The sum of the balances should be equal to `total_payment_token`.
     pub deposits: UnorderedMap<AccountId, Balance>,
 
     /// The payment config is inherit when sale is created.
@@ -177,6 +178,11 @@ impl Sale {
     #[inline]
     pub(crate) fn assert_after_release_period(&self) {
         require!(get_current_epoch_millis() >= self.release_date_timestamp);
+    }
+
+    #[inline]
+    pub(crate) fn assert_after_close_period(&self) {
+        require!(get_current_epoch_millis() > self.close_date_timestamp);
     }
 
     pub(crate) fn is_within_funding_period(&self) -> bool {

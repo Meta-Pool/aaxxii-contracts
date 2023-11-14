@@ -20,6 +20,7 @@ The overall steps:
 2. Users pays for tokens
 3. Seller deposits the tokens to sold
 4. Tokens to sold are released
+5. Seller collects payment tokens
 
 ## 1. Sale creation
 
@@ -82,3 +83,11 @@ pub fn withdraw_excess_sold_tokens(&mut self, sale_id: u32) -> Promise
 ```
 
 4. And the last case is that the Seller deposited *some* but not all the sold tokens, then the sale fails and the seller can recover the tokens using the same `withdraw_excess_sold_tokens` method.
+
+## 5. Seller collects payment tokens
+
+The last step is for the seller to collect the payment tokens.
+
+```rust
+pub fn collect_tokens(&mut self, sale_id: u32) -> Promise
+```

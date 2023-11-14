@@ -186,33 +186,51 @@ impl KatherineSaleContract {
     // *******************
 
     pub fn withdraw_tokens(&mut self, sale_id: u32) -> Promise {
-        let buyer_id = env::predecessor_account_id();
         let mut sale = self.internal_get_sale(sale_id);
-
         sale.assert_after_release_period();
+
+        let buyer_id = env::predecessor_account_id();
+        let claimable = sale.claimable_sold_token_for_buyers.remove(&buyer_id).expect("No claimable tokens.");
+        let deposit = sale.deposits.remove(&buyer_id).expect("No deposit.");
+        require!(claimable > 0 && deposit > 0);
+
         if sale.are_sold_tokens_covered() {
-            let amount = sale.get_claimable_sold_token_for_buyers(&buyer_id);
-            require!(amount > 0);
             self.internal_buyer_withdraw_sold_tokens(
                 buyer_id,
-                U128::from(amount),
+                claimable,
+                deposit,
                 &mut sale
             )
         } else {
-            let amount = sale.get_deposits(&buyer_id);
-            require!(amount > 0);
             self.internal_buyer_withdraw_payment_token(
                 buyer_id,
-                U128::from(amount),
+                claimable,
+                deposit,
                 &mut sale
             )
+        }
+    }
+
+    // *******************
+    // * Seller Withdraw *
+    // *******************
+
+    pub fn collect_tokens(&mut self, sale_id: u32) -> Promise {
+        self.assert_only_owner();
+        let mut sale = self.internal_get_sale(sale_id);
+        sale.assert_after_close_period();
+        require!(sale.are_sold_tokens_covered(), "Deposit all the sold tokens");
+
+        if sale.is_near_accepted() {
+            self.internal_seller_withdraw_near()
+        } else {
+            self.internal_seller_withdraw_payment_token()
         }
     }
 
     pub fn withdraw_excess_sold_tokens(&mut self, sale_id: u32) -> Promise {
         // Only after the close date.
         unimplemented!();
-
     }
 
     // ********
