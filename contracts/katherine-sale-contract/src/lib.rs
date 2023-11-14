@@ -233,6 +233,8 @@ impl KatherineSaleContract {
         unimplemented!();
     }
 
+    ////// TODO: implement the fee logic.
+
     // ********
     // * View *
     // ********

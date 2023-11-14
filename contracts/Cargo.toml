@@ -1,5 +1,6 @@
 [workspace]
 members = [
-	"katherine-sale-contract"
+	"katherine-sale-contract",
+	"test-p-token"
 ]
 
