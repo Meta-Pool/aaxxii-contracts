@@ -4,6 +4,13 @@ use near_sdk::json_types::U128;
 use near_sdk::{Promise, env, log, near_bindgen, PromiseOrValue, require};
 use crate::interface::*;
 
+/// Notice:
+/// There are three sales variables, that work as reservoirs, and will be affected
+/// by withdraws:
+///     - sale.sold_tokens_for_buyers
+///     - sale.required_sold_token
+///     - sale.total_payment_token
+
 #[near_bindgen]
 impl KatherineSaleContract {
     pub(crate) fn internal_buyer_withdraw_sold_tokens(
@@ -13,13 +20,14 @@ impl KatherineSaleContract {
         deposit: u128,
         sale: &mut Sale
     ) -> Promise {
+        // Removing claimable tokens. `total_payment_token` stays the same.
         sale.sold_tokens_for_buyers -= claimable;
         sale.required_sold_token -= claimable;
         self.sales.replace(sale.id as u64, &sale);
+
         let claimable = U128::from(claimable);
         let deposit = U128::from(deposit);
         let token_id = sale.sold_token_contract_address.clone();
-
         ext_ft::ext(token_id.clone())
             .with_static_gas(GAS_FOR_FT_TRANSFER)
             .with_attached_deposit(1)
@@ -57,6 +65,8 @@ impl KatherineSaleContract {
             },
             PromiseResult::Failed => {
                 let mut sale = self.internal_get_sale(sale_id);
+
+                // Important: Recover the claimable tokens and deposit from user.
                 sale.deposits.insert(buyer_id, &deposit.0);
                 sale.claimable_sold_token_for_buyers.insert(&buyer_id, &claimable);
                 sale.sold_tokens_for_buyers += claimable;
@@ -70,7 +80,8 @@ impl KatherineSaleContract {
         };
     }
 
-    /// Unsuccessful sale
+    /// Unsuccessful sale. Payment tokens will only be returned to the buyer if the
+    /// seller never deposited the full `required_sold_token` before the release date.
     pub(crate) fn internal_buyer_withdraw_payment_token(
         &mut self,
         buyer_id: AccountId,
@@ -78,6 +89,8 @@ impl KatherineSaleContract {
         deposit: u128,
         sale: &mut Sale
     ) -> Promise {
+        // Removing claimable tokens and returning the deposit to the buyer.
+        // `sold_tokens_for_buyers` stays the same for the seller to reclaim.
         sale.required_sold_token -= claimable;
         sale.total_payment_token -= deposit;
         self.sales.replace(sale.id as u64, &sale);
@@ -90,25 +103,46 @@ impl KatherineSaleContract {
             Promise::new(buyer_id).transfer(deposit)
         } else {
             // If sale is not in near then expect a token address.
-            let token_id = sale.payment_config.payment_token_contract_address.clone().unwrap();
-            let claimable = U128::from(claimable);
-            let deposit = U128::from(deposit);
-
-            ext_ft::ext(token_id.clone())
-                .with_static_gas(GAS_FOR_FT_TRANSFER)
-                .with_attached_deposit(1)
-                .ft_transfer(buyer_id.clone(), deposit, None).then(
-                    Self::ext(env::current_account_id())
-                        .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
-                        .buyer_withdraw_payment_tokens_resolve(
-                            &buyer_id,
-                            &token_id,
-                            claimable,
-                            deposit,
-                            sale.id
-                        )
-                )
+            let token_id = sale
+                .payment_config
+                .payment_token_contract_address
+                .clone()
+                .unwrap();
+            self.buyer_withdraw_ft_payment_token(
+                buyer_id,
+                claimable,
+                deposit,
+                token_id,
+                sale.id
+            )
         }
+    }
+
+    fn buyer_withdraw_ft_payment_token(
+        &mut self,
+        buyer_id: AccountId,
+        claimable: u128,
+        deposit: u128,
+        token_id: AccountId,
+        sale_id: u32
+    ) -> Promise {
+        let claimable = U128::from(claimable);
+        let deposit = U128::from(deposit);
+
+        ext_ft::ext(token_id.clone())
+            .with_static_gas(GAS_FOR_FT_TRANSFER)
+            .with_attached_deposit(1)
+            .ft_transfer(buyer_id.clone(), deposit, None).then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
+                    .buyer_withdraw_payment_tokens_resolve(
+                        &buyer_id,
+                        &token_id,
+                        claimable,
+                        deposit,
+                        sale_id
+                    )
+            )
     }
 
     #[private]
@@ -134,10 +168,11 @@ impl KatherineSaleContract {
                 let deposit = deposit.0;
                 let mut sale = self.internal_get_sale(sale_id);
 
+                // Important: Recover the claimable tokens and deposit from user.
                 sale.deposits.insert(buyer_id, &deposit);
                 sale.claimable_sold_token_for_buyers.insert(&buyer_id, &claimable);
-                sale.total_payment_token += deposit;
                 sale.required_sold_token += claimable;
+                sale.total_payment_token += deposit;
                 self.sales.replace(sale.id as u64, &sale);
                 log!(
                     "FAILED: {} tokens not transferred. Recovering sale {} state.",
@@ -147,11 +182,88 @@ impl KatherineSaleContract {
         };
     }
 
-    pub(crate) fn internal_seller_withdraw_near(&mut self) -> Promise {
-        unimplemented!();
+    pub(crate) fn internal_collect_payments(&mut self, sale: &mut Sale) -> Promise {
+        let fee = proportional(
+            sale.total_payment_token,
+            sale.payment_config.sale_fee as u128,
+            BASIS_POINT as u128
+        );
+        let to_send = sale.total_payment_token - fee;
+        sale.total_payment_token = 0;
+        sale.total_fees = fee;
+        self.sales.replace(sale.id as u64, &sale);
+
+        if sale.is_near_accepted() {
+            Promise::new(self.treasury_id.clone()).transfer(to_send)
+        } else {
+            // If sale is not in near then expect a token address.
+            let token_id = sale
+                .payment_config
+                .payment_token_contract_address
+                .clone()
+                .unwrap();
+            self.internal_seller_withdraw_payment_token(
+                token_id,
+                to_send,
+                sale.id
+            )
+        }
     }
 
-    pub(crate) fn internal_seller_withdraw_payment_token(&mut self) -> Promise {
-        unimplemented!();
+    fn internal_seller_withdraw_payment_token(
+        &mut self,
+        token_id: AccountId,
+        amount: u128,
+        sale_id: u32
+    ) -> Promise {
+        let amount = U128::from(amount);
+
+        ext_ft::ext(token_id.clone())
+            .with_static_gas(GAS_FOR_FT_TRANSFER)
+            .with_attached_deposit(1)
+            .ft_transfer(self.treasury_id.clone(), amount, None).then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
+                    .seller_withdraw_payment_tokens_resolve(
+                        &self.treasury_id,
+                        &token_id,
+                        amount,
+                        sale_id
+                    )
+            )
     }
+
+    #[private]
+    pub fn seller_withdraw_payment_tokens_resolve(
+        &mut self,
+        treasury_id: &AccountId,
+        token_id: &AccountId,
+        amount: U128,
+        sale_id: u32
+    ) {
+        let amount = amount.0;
+
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Successful(_) => {
+                log!(
+                    "WITHDRAW: {} tokens of payment-token {} transferred to {}",
+                    amount, token_id, treasury_id
+                );
+            },
+            PromiseResult::Failed => {
+                let mut sale = self.internal_get_sale(sale_id);
+
+                // Important: Recover the claimable tokens and deposit from user.
+                sale.total_payment_token = amount + sale.total_fees;
+                sale.total_fees = 0;
+                self.sales.replace(sale.id as u64, &sale);
+                log!(
+                    "FAILED: {} tokens not transferred. Recovering sale {} state.",
+                    amount, sale_id
+                );
+            }
+        };
+    }
+
 }

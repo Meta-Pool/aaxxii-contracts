@@ -59,6 +59,8 @@ pub struct Sale {
 
     /// The payment config is inherit when sale is created.
     pub payment_config: PaymentConfig,
+
+    pub total_fees: u128,
 }
 
 impl Sale {
@@ -105,6 +107,7 @@ impl Sale {
                 payment_token_unit,
                 sale_fee,
             },
+            total_fees: 0,
         }
     }
 

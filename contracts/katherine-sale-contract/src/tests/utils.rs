@@ -47,9 +47,9 @@ pub fn sold_token_contract() -> AccountId {
 //     AccountId::new_unchecked("contract.metavote.near".to_string())
 // }
 
-// pub fn treasury_account() -> AccountId {
-//     AccountId::new_unchecked("treasury.metavote.near".to_string())
-// }
+pub fn treasury_account() -> AccountId {
+    AccountId::new_unchecked("treasury.metavote.near".to_string())
+}
 
 pub fn owner_account() -> AccountId {
     AccountId::new_unchecked("owner.metavote.near".to_string())

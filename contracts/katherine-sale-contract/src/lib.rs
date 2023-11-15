@@ -44,6 +44,7 @@ pub struct KatherineSaleContract {
     /// e.g. 1.0 USDT == 1_000_000 unit.
     pub payment_token_unit: u128,
     /// % of the total sale for the owner_id.
+    pub treasury_id: AccountId,
     pub sale_fee: BasisPoints,
 }
 
@@ -56,6 +57,7 @@ impl KatherineSaleContract {
         min_deposit_amount_in_payment_token: U128,
         payment_token_contract_address: AccountId,
         payment_token_unit: U128,
+        treasury_id: AccountId,
         sale_fee: BasisPoints,
     ) -> Self {
         check_basis_points(sale_fee);
@@ -69,6 +71,7 @@ impl KatherineSaleContract {
             min_deposit_amount_in_payment_token: min_deposit_amount_in_payment_token.0,
             payment_token_contract_address,
             payment_token_unit: payment_token_unit.0,
+            treasury_id,
             sale_fee,
         }
     }
@@ -185,12 +188,18 @@ impl KatherineSaleContract {
     // * Buyers Withdraw *
     // *******************
 
+    /// When a buyer withdraw form a sale ALL the claimable tokens are send to
+    /// the buyer, and the deposit is removed from `sale.deposits`.
     pub fn withdraw_tokens(&mut self, sale_id: u32) -> Promise {
         let mut sale = self.internal_get_sale(sale_id);
         sale.assert_after_release_period();
 
         let buyer_id = env::predecessor_account_id();
-        let claimable = sale.claimable_sold_token_for_buyers.remove(&buyer_id).expect("No claimable tokens.");
+        // Important: Claimable tokens and buyer deposit are removed.
+        let claimable = sale
+            .claimable_sold_token_for_buyers
+            .remove(&buyer_id)
+            .expect("No claimable tokens.");
         let deposit = sale.deposits.remove(&buyer_id).expect("No deposit.");
         require!(claimable > 0 && deposit > 0);
 
@@ -215,17 +224,13 @@ impl KatherineSaleContract {
     // * Seller Withdraw *
     // *******************
 
-    pub fn collect_tokens(&mut self, sale_id: u32) -> Promise {
+    pub fn collect_payments(&mut self, sale_id: u32) -> Promise {
         self.assert_only_owner();
         let mut sale = self.internal_get_sale(sale_id);
         sale.assert_after_close_period();
         require!(sale.are_sold_tokens_covered(), "Deposit all the sold tokens");
 
-        if sale.is_near_accepted() {
-            self.internal_seller_withdraw_near()
-        } else {
-            self.internal_seller_withdraw_payment_token()
-        }
+        self.internal_collect_payments(&mut sale)
     }
 
     pub fn withdraw_excess_sold_tokens(&mut self, sale_id: u32) -> Promise {

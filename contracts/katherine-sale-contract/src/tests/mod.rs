@@ -17,6 +17,7 @@ fn new_katherine_contract() -> KatherineSaleContract {
         U128::from(MIN_DEPOSIT_AMOUNT_IN_PAYMENT_TOKEN),
         usdt_token_contract(),
         U128::from(USDT_UNIT),
+        treasury_account(),
         SALE_FEE,
     )
 }
