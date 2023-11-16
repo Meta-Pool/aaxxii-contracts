@@ -83,7 +83,7 @@ impl KatherineSaleContract {
         // Update Sale and Buyer
         self.sales.replace(sale.id as u64, &sale);
         let mut buyer = self.internal_get_buyer(&buyer_id);
-        buyer.active_sales.insert(&sale.id);
+        buyer.supporting_sales.insert(&sale.id);
         self.buyers.insert(&buyer_id, &buyer);
     }
 

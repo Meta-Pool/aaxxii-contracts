@@ -54,18 +54,25 @@ impl KatherineSaleContract {
         sale_id: u32
     ) {
         let claimable = claimable.0;
+        let mut buyer = self.internal_get_buyer(&buyer_id);
 
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {
+                if buyer.is_empty() {
+                    self.buyers.remove(&buyer_id);
+                    log!("GODSPEED: {} is no longer part of Katherine!", &buyer_id);
+                }
                 log!(
                     "WITHDRAW: {} tokens of sold-token {} transferred to {}",
                     claimable, token_id, buyer_id
                 );
             },
             PromiseResult::Failed => {
-                let mut sale = self.internal_get_sale(sale_id);
+                buyer.supporting_sales.insert(&sale_id);
+                self.buyers.insert(&buyer_id, &buyer);
 
+                let mut sale = self.internal_get_sale(sale_id);
                 // Important: Recover the claimable tokens and deposit from user.
                 sale.deposits.insert(buyer_id, &deposit.0);
                 sale.claimable_sold_token_for_buyers.insert(&buyer_id, &claimable);
@@ -155,19 +162,26 @@ impl KatherineSaleContract {
         sale_id: u32
     ) {
         let claimable = claimable.0;
+        let mut buyer = self.internal_get_buyer(&buyer_id);
 
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {
+                if buyer.is_empty() {
+                    self.buyers.remove(&buyer_id);
+                    log!("GODSPEED: {} is no longer part of Katherine!", &buyer_id);
+                }
                 log!(
                     "WITHDRAW: {} tokens of payment-token {} transferred back to {}",
                     claimable, token_id, buyer_id
                 );
             },
             PromiseResult::Failed => {
+                buyer.supporting_sales.insert(&sale_id);
+                self.buyers.insert(&buyer_id, &buyer);
+
                 let deposit = deposit.0;
                 let mut sale = self.internal_get_sale(sale_id);
-
                 // Important: Recover the claimable tokens and deposit from user.
                 sale.deposits.insert(buyer_id, &deposit);
                 sale.claimable_sold_token_for_buyers.insert(&buyer_id, &claimable);

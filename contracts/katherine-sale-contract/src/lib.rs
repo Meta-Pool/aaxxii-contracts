@@ -21,7 +21,7 @@ mod types;
 mod utils;
 mod withdraw;
 
-/// There are 5 possible stages of a Sale based on the date:
+/// There are 5 possible stages of a Sale depending on the date:
 ///
 ///      open                close              release
 ///       |-------------------|-------------------|
@@ -29,7 +29,6 @@ mod withdraw;
 ///   0            1                    2            3
 ///
 /// We'll be using the stage number as convention.
-
 
 /// Time in this contract is measured in Milliseconds.
 
@@ -217,6 +216,10 @@ impl KatherineSaleContract {
         let deposit = sale.deposits.remove(&buyer_id).expect("No deposit.");
         require!(claimable > 0 && deposit > 0);
 
+        let mut buyer = self.internal_get_buyer(&buyer_id);
+        buyer.supporting_sales.remove(&sale.id);
+        self.buyers.insert(&buyer_id, &buyer);
+
         if sale.are_sold_tokens_covered() {
             self.internal_buyer_withdraw_sold_tokens(
                 buyer_id,
@@ -278,31 +281,6 @@ impl KatherineSaleContract {
         U128::from(sale.total_fees)
     }
 
-    // pub fn get_active_projects(
-    //     &self,
-    //     from_index: u32,
-    //     limit: u32,
-    // ) -> Option<ActiveKickstarterJSON> {
-    //     let projects = self.active_projects.to_vec();
-    //     let projects_len = projects.len() as u64;
-    //     let start: u64 = from_index.into();
-    //     if start >= projects_len {
-    //         return None;
-    //     }
-    //     let mut active: Vec<KickstarterJSON> = Vec::new();
-    //     let mut open: Vec<KickstarterJSON> = Vec::new();
-    //     for index in start..std::cmp::min(start + limit as u64, projects_len) {
-    //         let kickstarter_id = projects.get(index as usize).expect("Out of index!");
-    //         let kickstarter = self.internal_get_kickstarter(*kickstarter_id);
-    //         if kickstarter.is_within_funding_period() {
-    //             open.push(kickstarter.to_json());
-    //         } else {
-    //             active.push(kickstarter.to_json());
-    //         }
-    //     }
-    //     Some(ActiveKickstarterJSON { active, open })
-    // }
-
     pub fn get_active_sales(
         &self,
         from_index: u32,
@@ -315,6 +293,7 @@ impl KatherineSaleContract {
         for index in from_index..std::cmp::min(from_index + limit, sales_len) {
             let sale_id = sales.get(index as usize).expect("Out of index!");
             let sale = self.internal_get_sale(*sale_id);
+            // Even if the sale is in the `self.active_sales` list it might be inactive.
             if sale.is_active() {
                 result.push(sale.to_json());
             }
@@ -322,47 +301,73 @@ impl KatherineSaleContract {
         result
     }
 
-    pub fn get_sale(&self, sale_id: u32) -> U128 {
-        unimplemented!();
+    pub fn get_sale(&self, sale_id: u32) -> SaleJSON {
+        self.internal_get_sale(sale_id).to_json()
     }
 
-    pub fn get_sale_details(&self, sale_id: u32) -> U128 {
-        unimplemented!();
-    }
-
-    pub fn get_sales(&self, from_index: u32, limit: u32) -> U128 {
-        unimplemented!();
+    pub fn get_sales(&self, from_index: u32, limit: u32) -> Vec<SaleJSON> {
+        let sales_len = self.get_number_of_sales();
+        let mut result = Vec::<SaleJSON>::new();
+        if from_index >= sales_len { return result; }
+        for index in from_index..std::cmp::min(from_index + limit, sales_len) {
+            let sale = self.sales.get(index as u64).expect("Out of index!");
+            result.push(sale.to_json());
+        }
+        result
     }
 
     pub fn get_sale_id_from_slug(&self, slug: String) -> u32 {
-        unimplemented!();
+        match self.sale_id_by_slug.get(&slug) {
+            Some(id) => id,
+            None => panic!("Nonexistent slug!"),
+        }
     }
 
-    pub fn get_buyer_sales(&self, buyer_id: AccountId) -> U128 {
-        unimplemented!();
+    pub fn get_buyer_sales(&self, buyer_id: AccountId) -> Vec<u32> {
+        let buyer = self.internal_get_buyer(&buyer_id);
+        buyer.supporting_sales.to_vec()
     }
 
-    pub fn get_buyer_detailed_list(
+    pub fn get_buyer_sales_list(
         &self,
         buyer_id: AccountId,
         from_index: u32,
         limit: u32,
-    )// -> Option<Vec<SupporterDetailedJSON>> 
-    {
-        unimplemented!();
+    ) -> Vec<SaleJSON> {
+        let buyer = self.internal_get_buyer(&buyer_id);
+        let sales = buyer.supporting_sales.to_vec();
+        let sales_len = sales.len() as u32;
+        let mut result = Vec::<SaleJSON>::new();
+        if from_index >= sales_len { return result; }
+        for index in from_index..std::cmp::min(from_index + limit, sales_len) {
+            let sale_id = sales.get(index as usize).expect("Out of index!");
+            let sale = self.internal_get_sale(*sale_id);
+            result.push(sale.to_json());
+        }
+        result
     }
 
     pub fn get_buyers(
         &self,
         from_index: u32,
         limit: u32
-    )// -> Vec<SupporterId>
-    {
-
+    ) -> Vec<AccountId> {
+        let keys = self.buyers.keys_as_vector();
+        let to = std::cmp::min(from_index + limit, keys.len().try_into().unwrap());
+        return (from_index..to).map(|index| keys.get(index as u64).unwrap()).collect();
     }
 
     pub fn get_number_of_sales(&self) -> u32 {
         self.sales.len().try_into().unwrap()
+    }
+
+    pub fn get_number_of_buyers(&self) -> u32 {
+        self.sales.len().try_into().unwrap()
+    }
+
+    pub fn get_number_of_buyers_for_sale(&self, sale_id: u32) -> u32 {
+        let sale = self.internal_get_sale(sale_id);
+        sale.deposits.len().try_into().unwrap()
     }
 
     pub fn get_buyer_claimable_sold_token(

@@ -241,9 +241,7 @@ impl KatherineSaleContract {
     }
 
     pub(crate) fn internal_get_sale(&self, sale_id: u32) -> Sale {
-        self.sales
-            .get(sale_id as u64)
-            .expect("Unknown sale.")
+        self.sales.get(sale_id as u64).expect("Unknown sale.")
     }
 
     pub(crate) fn remove_sale_from_active_list(&mut self, sale_id: u32) {

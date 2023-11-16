@@ -5,13 +5,13 @@ use near_sdk::{AccountId, require};
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Buyer {
-    pub active_sales: UnorderedSet<u32>
+    pub supporting_sales: UnorderedSet<u32>
 }
 
 impl Buyer {
     pub(crate) fn new(id: &AccountId) -> Self {
         Self {
-            active_sales: UnorderedSet::new(
+            supporting_sales: UnorderedSet::new(
                 StorageKey::BuyerActiveSales {
                     hash_id: generate_hash_id(id.to_string())
                 }
@@ -20,12 +20,12 @@ impl Buyer {
     }
 
     pub(crate) fn in_sale(&self, sale_id: u32) -> bool {
-        return self.active_sales.contains(&sale_id)
+        return self.supporting_sales.contains(&sale_id)
     }
 
     /// When the buyer.is_empty() it will be removed.
     pub(crate) fn is_empty(&self) -> bool {
-        return self.active_sales.is_empty();
+        return self.supporting_sales.is_empty();
     }
 }
 
