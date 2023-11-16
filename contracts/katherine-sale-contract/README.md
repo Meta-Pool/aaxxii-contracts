@@ -1,5 +1,7 @@
 # AAXXII sales
 
+<img src="../../media/mp-aaxxii.png" width="400">
+
 ## Introduction
 
 This is a contract that allow the sales of tokens. The logic consider that a `Sale` has three dates:
