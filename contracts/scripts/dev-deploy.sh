@@ -2,8 +2,10 @@
 set -e
 
 NEAR_ACCOUNT="kate_tester3.testnet"
+BUYER_ACCOUNT="jomsox.testnet"
 YOCTO_UNITS="000000000000000000000000"
 USDC_UNITS="000000"
+TOTAL_PREPAID_GAS=300000000000000
 
 rm -rf neardev/
 rm -rf neardev_ptoken/
@@ -17,30 +19,21 @@ mv neardev/ neardev_usdc/
 PTOKEN_CONTRACT_ADDRESS=$(head -n1 ./neardev_ptoken/dev-account)
 USDC_CONTRACT_ADDRESS=$(head -n1 ./neardev_usdc/dev-account)
 
-NEAR_ENV=testnet near dev-deploy --wasmFile res/katherine_sale_contract.wasm --initFunction new --initArgs '{"owner_id": "'$NEAR_ACCOUNT'", "min_deposit_amount_in_near": "1'$YOCTO_UNITS'", "min_deposit_amount_in_payment_token": "10'$USDC_UNITS'", "payment_token_contract_address": "'$USDC_CONTRACT_ADDRESS'", "payment_token_unit": "1'$USDC_UNITS'", "sale_fee": 200 }' --accountId $NEAR_ACCOUNT
+NEAR_ENV=testnet near dev-deploy --wasmFile res/katherine_sale_contract.wasm --initFunction new --initArgs '{"owner_id": "'$NEAR_ACCOUNT'", "min_deposit_amount_in_near": "1'$YOCTO_UNITS'", "min_deposit_amount_in_payment_token": "10'$USDC_UNITS'", "payment_token_contract_address": "'$USDC_CONTRACT_ADDRESS'", "payment_token_unit": "1'$USDC_UNITS'", "treasury_id": "'$NEAR_ACCOUNT'", "sale_fee": 200 }' --accountId $NEAR_ACCOUNT
 KATHERINE_CONTRACT_ADDRESS=$(head -n1 ./neardev/dev-account)
 
 echo "Sold Token: "$PTOKEN_CONTRACT_ADDRESS
-echo "USDC -----: "$USDC_CONTRACT_ADDRESS
+echo "USDC Token: "$USDC_CONTRACT_ADDRESS
 echo "Katherine-: "$KATHERINE_CONTRACT_ADDRESS
-echo "Owner ----: "$BEAR_CONTRACT_ADDRESS
+echo "Owner ----: "$NEAR_ACCOUNT
 
-# KATHERINE_OWNER_ID="kate_tester3.testnet" # This account is owner of all the 3 contracts.
-# KICKSTARTER_OWNER_ID="kate_kickstarter_owner.testnet"
-# SUPPORTER_ID="kate_supporter.testnet"
-
-# TOTAL_PREPAID_GAS=300000000000000
-
-# echo "------------------ Registering accounts"
-# NEAR_ENV=testnet near call $METAPOOL_CONTRACT_ADDRESS register_account '{"account_id": "'$SUPPORTER_ID'"}' --accountId $SUPPORTER_ID
-# NEAR_ENV=testnet near call $METAPOOL_CONTRACT_ADDRESS register_account '{"account_id": "'$KICKSTARTER_OWNER_ID'"}' --accountId $KICKSTARTER_OWNER_ID
-# NEAR_ENV=testnet near call $METAPOOL_CONTRACT_ADDRESS register_account '{"account_id": "'$KATHERINE_CONTRACT_ADDRESS'"}' --accountId $KATHERINE_CONTRACT_ADDRESS
-# NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$SUPPORTER_ID'"}' --accountId $SUPPORTER_ID
-# NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$KICKSTARTER_OWNER_ID'"}' --accountId $KICKSTARTER_OWNER_ID
-# NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$KATHERINE_CONTRACT_ADDRESS'"}' --accountId $KATHERINE_CONTRACT_ADDRESS
-# NEAR_ENV=testnet near call $BEAR_CONTRACT_ADDRESS register_account '{"account_id": "'$SUPPORTER_ID'"}' --accountId $SUPPORTER_ID
-# NEAR_ENV=testnet near call $BEAR_CONTRACT_ADDRESS register_account '{"account_id": "'$KICKSTARTER_OWNER_ID'"}' --accountId $KICKSTARTER_OWNER_ID
-# NEAR_ENV=testnet near call $BEAR_CONTRACT_ADDRESS register_account '{"account_id": "'$KATHERINE_CONTRACT_ADDRESS'"}' --accountId $KATHERINE_CONTRACT_ADDRESS
+echo "------------------ Registering accounts"
+# NEAR_ENV=testnet near call $USDC_CONTRACT_ADDRESS register_account '{"account_id": "'$NEAR_ACCOUNT'"}' --accountId $NEAR_ACCOUNT
+NEAR_ENV=testnet near call $USDC_CONTRACT_ADDRESS register_account '{"account_id": "'$BUYER_ACCOUNT'"}' --accountId $NEAR_ACCOUNT
+NEAR_ENV=testnet near call $USDC_CONTRACT_ADDRESS register_account '{"account_id": "'$KATHERINE_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
+# NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$NEAR_ACCOUNT'"}' --accountId $NEAR_ACCOUNT
+NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$BUYER_ACCOUNT'"}' --accountId $NEAR_ACCOUNT
+NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$KATHERINE_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
 
 # echo "------------------ Sending stNear to the supporter"
 # NEAR_ENV=testnet near call $METAPOOL_CONTRACT_ADDRESS ft_transfer '{"receiver_id": "'$SUPPORTER_ID'", "amount": "'15$YOCTO_UNITS'"}' --accountId $KATHERINE_OWNER_ID --depositYocto 1 --gas $TOTAL_PREPAID_GAS

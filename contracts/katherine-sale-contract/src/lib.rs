@@ -21,6 +21,16 @@ mod types;
 mod utils;
 mod withdraw;
 
+/// There are 5 possible stages of a Sale based on the date:
+///
+///      open                close              release
+///       |-------------------|-------------------|
+/// Stages:
+///   0            1                    2            3
+///
+/// We'll be using the stage number as convention.
+
+
 /// Time in this contract is measured in Milliseconds.
 
 #[near_bindgen]
@@ -174,6 +184,9 @@ impl KatherineSaleContract {
     // * Payments using NEAR *
     // ***********************
 
+    /// Buyers can purchase tokens only within the funding period.
+    /// Same for buyers ft payment token deposit [deposit.rs]
+    /// Only callable during `stage 1`.
     #[payable]
     pub fn purchase_token_with_near(&mut self, sale_id: u32) {
         let mut sale = self.internal_get_sale(sale_id);
@@ -190,6 +203,7 @@ impl KatherineSaleContract {
 
     /// When a buyer withdraw form a sale ALL the claimable tokens are send to
     /// the buyer, and the deposit is removed from `sale.deposits`.
+    /// Only callable during `stage 3`.
     pub fn withdraw_tokens(&mut self, sale_id: u32) -> Promise {
         let mut sale = self.internal_get_sale(sale_id);
         sale.assert_after_release_period();
@@ -224,17 +238,32 @@ impl KatherineSaleContract {
     // * Seller Withdraw *
     // *******************
 
+    /// Only callable during `stage 2 and 3`, only if sold tokens are covered.
     pub fn collect_payments(&mut self, sale_id: u32) -> Promise {
         self.assert_only_owner();
         let mut sale = self.internal_get_sale(sale_id);
         sale.assert_after_close_period();
+        self.remove_sale_from_active_list(sale_id);
         require!(sale.are_sold_tokens_covered(), "Deposit all the sold tokens");
 
         self.internal_collect_payments(&mut sale)
     }
 
     pub fn withdraw_excess_sold_tokens(&mut self, sale_id: u32) -> Promise {
-        // Only after the close date.
+        self.assert_only_owner();
+        let mut sale = self.internal_get_sale(sale_id);
+        sale.assert_after_close_period();
+        self.remove_sale_from_active_list(sale_id);
+        
+        if sale.are_sold_tokens_covered() {
+            // check if sale has more token than what they need to cover deposits.
+            // return excess
+        } else {
+            // IMPORTANT: If we're in stage 2, then seller can still deposit more sold
+            // tokens to cover the deposits.
+            sale.assert_after_release_period();
+        }
+
         unimplemented!();
     }
 
@@ -244,22 +273,110 @@ impl KatherineSaleContract {
     // * View *
     // ********
 
+    pub fn get_sale_fee(&self, sale_id: u32) -> U128 {
+        let sale = self.internal_get_sale(sale_id);
+        U128::from(sale.total_fees)
+    }
+
+    // pub fn get_active_projects(
+    //     &self,
+    //     from_index: u32,
+    //     limit: u32,
+    // ) -> Option<ActiveKickstarterJSON> {
+    //     let projects = self.active_projects.to_vec();
+    //     let projects_len = projects.len() as u64;
+    //     let start: u64 = from_index.into();
+    //     if start >= projects_len {
+    //         return None;
+    //     }
+    //     let mut active: Vec<KickstarterJSON> = Vec::new();
+    //     let mut open: Vec<KickstarterJSON> = Vec::new();
+    //     for index in start..std::cmp::min(start + limit as u64, projects_len) {
+    //         let kickstarter_id = projects.get(index as usize).expect("Out of index!");
+    //         let kickstarter = self.internal_get_kickstarter(*kickstarter_id);
+    //         if kickstarter.is_within_funding_period() {
+    //             open.push(kickstarter.to_json());
+    //         } else {
+    //             active.push(kickstarter.to_json());
+    //         }
+    //     }
+    //     Some(ActiveKickstarterJSON { active, open })
+    // }
+
+    pub fn get_active_sales(
+        &self,
+        from_index: u32,
+        limit: u32
+    ) -> Vec<SaleJSON> {
+        let sales = self.active_sales.to_vec();
+        let sales_len = sales.len() as u32;
+        let mut result = Vec::<SaleJSON>::new();
+        if from_index >= sales_len { return result; }
+        for index in from_index..std::cmp::min(from_index + limit, sales_len) {
+            let sale_id = sales.get(index as usize).expect("Out of index!");
+            let sale = self.internal_get_sale(*sale_id);
+            if sale.is_active() {
+                result.push(sale.to_json());
+            }
+        }
+        result
+    }
+
+    pub fn get_sale(&self, sale_id: u32) -> U128 {
+        unimplemented!();
+    }
+
+    pub fn get_sale_details(&self, sale_id: u32) -> U128 {
+        unimplemented!();
+    }
+
+    pub fn get_sales(&self, from_index: u32, limit: u32) -> U128 {
+        unimplemented!();
+    }
+
+    pub fn get_sale_id_from_slug(&self, slug: String) -> u32 {
+        unimplemented!();
+    }
+
+    pub fn get_buyer_sales(&self, buyer_id: AccountId) -> U128 {
+        unimplemented!();
+    }
+
+    pub fn get_buyer_detailed_list(
+        &self,
+        buyer_id: AccountId,
+        from_index: u32,
+        limit: u32,
+    )// -> Option<Vec<SupporterDetailedJSON>> 
+    {
+        unimplemented!();
+    }
+
+    pub fn get_buyers(
+        &self,
+        from_index: u32,
+        limit: u32
+    )// -> Vec<SupporterId>
+    {
+
+    }
+
     pub fn get_number_of_sales(&self) -> u32 {
         self.sales.len().try_into().unwrap()
     }
 
-    pub fn get_claimable_sold_token_for_buyers(
+    pub fn get_buyer_claimable_sold_token(
         &self,
         buyer_id: AccountId,
         sale_id: u32
     ) -> U128 {
         let sale = self.internal_get_sale(sale_id);
-        U128::from(sale.get_claimable_sold_token_for_buyers(&buyer_id))
+        U128::from(sale.get_buyer_claimable_sold_token(&buyer_id))
     }
 
-    pub fn get_deposits(&self, buyer_id: AccountId, sale_id: u32) -> U128 {
+    pub fn get_buyer_deposit(&self, buyer_id: AccountId, sale_id: u32) -> U128 {
         let sale = self.internal_get_sale(sale_id);
-        U128::from(sale.get_deposits(&buyer_id))
+        U128::from(sale.get_buyer_deposit(&buyer_id))
     }
 }
 

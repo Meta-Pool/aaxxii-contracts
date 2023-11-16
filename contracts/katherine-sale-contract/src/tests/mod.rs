@@ -101,8 +101,8 @@ fn test_near_deposit() {
     contract.purchase_token_with_near(0);
 
     testing_env!(context.is_view(true).build());
-    assert_eq!(6 * NEAR, contract.get_claimable_sold_token_for_buyers(accounts(1), 0).0);
-    assert_eq!(3 * NEAR, contract.get_deposits(accounts(1), 0).0);
+    assert_eq!(6 * NEAR, contract.get_buyer_claimable_sold_token(accounts(1), 0).0);
+    assert_eq!(3 * NEAR, contract.get_buyer_deposit(accounts(1), 0).0);
     assert_eq!(6 * NEAR, contract.sales.get(0).unwrap().required_sold_token);
     assert_eq!(3 * NEAR, contract.sales.get(0).unwrap().total_payment_token);
     assert_eq!(0, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
@@ -117,8 +117,8 @@ fn test_near_deposit() {
     contract.purchase_token_with_near(0);
 
     testing_env!(context.is_view(true).build());
-    assert_eq!(2 * NEAR, contract.get_claimable_sold_token_for_buyers(accounts(2), 0).0);
-    assert_eq!(1 * NEAR, contract.get_deposits(accounts(2), 0).0);
+    assert_eq!(2 * NEAR, contract.get_buyer_claimable_sold_token(accounts(2), 0).0);
+    assert_eq!(1 * NEAR, contract.get_buyer_deposit(accounts(2), 0).0);
     assert_eq!(8 * NEAR, contract.sales.get(0).unwrap().required_sold_token);
     assert_eq!(4 * NEAR, contract.sales.get(0).unwrap().total_payment_token);
 
@@ -156,8 +156,8 @@ fn test_usdt_deposit() {
     contract.ft_on_transfer(accounts(1), U128::from(4 * USDT_UNIT), 0.to_string());
 
     testing_env!(context.is_view(true).build());
-    assert_eq!(8 * NEAR, contract.get_claimable_sold_token_for_buyers(accounts(1), 0).0);
-    assert_eq!(4 * USDT_UNIT, contract.get_deposits(accounts(1), 0).0);
+    assert_eq!(8 * NEAR, contract.get_buyer_claimable_sold_token(accounts(1), 0).0);
+    assert_eq!(4 * USDT_UNIT, contract.get_buyer_deposit(accounts(1), 0).0);
     assert_eq!(8 * NEAR, contract.sales.get(0).unwrap().required_sold_token);
     assert_eq!(4 * USDT_UNIT, contract.sales.get(0).unwrap().total_payment_token);
     assert_eq!(0, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
@@ -173,8 +173,8 @@ fn test_usdt_deposit() {
     contract.ft_on_transfer(accounts(2), U128::from(1 * USDT_UNIT), 0.to_string());
 
     testing_env!(context.is_view(true).build());
-    assert_eq!(2 * NEAR, contract.get_claimable_sold_token_for_buyers(accounts(2), 0).0);
-    assert_eq!(1 * USDT_UNIT, contract.get_deposits(accounts(2), 0).0);
+    assert_eq!(2 * NEAR, contract.get_buyer_claimable_sold_token(accounts(2), 0).0);
+    assert_eq!(1 * USDT_UNIT, contract.get_buyer_deposit(accounts(2), 0).0);
     assert_eq!(10 * NEAR, contract.sales.get(0).unwrap().required_sold_token);
     assert_eq!(5 * USDT_UNIT, contract.sales.get(0).unwrap().total_payment_token);
 

@@ -119,7 +119,7 @@ impl Sale {
         );
     }
 
-    pub(crate) fn get_claimable_sold_token_for_buyers(
+    pub(crate) fn get_buyer_claimable_sold_token(
         &self,
         buyer_id: &AccountId
     ) -> Balance {
@@ -129,7 +129,7 @@ impl Sale {
         }
     }
 
-    pub(crate) fn get_deposits(
+    pub(crate) fn get_buyer_deposit(
         &self,
         buyer_id: &AccountId
     ) -> Balance {
@@ -137,14 +137,6 @@ impl Sale {
             Some(amount) => amount,
             None => 0,
         }
-    }
-
-    pub(crate) fn assert_min_deposit_amount(&self, amount: Balance) {
-        assert!(
-            amount >= self.payment_config.min_deposit_amount,
-            "minimum deposit amount is {}",
-            self.payment_config.min_deposit_amount
-        );
     }
 
     pub(crate) fn from_payment_to_sold_token(&self, amount: u128) -> u128 {
@@ -158,6 +150,33 @@ impl Sale {
     #[inline]
     pub(crate) fn is_near_accepted(&self) -> bool {
         self.payment_config.payment_token_contract_address.is_none()
+    }
+
+    #[inline]
+    pub(crate) fn is_active(&self) -> bool {
+        get_current_epoch_millis() < self.close_date_timestamp
+    }
+    
+    pub(crate) fn is_within_funding_period(&self) -> bool {
+        let now = get_current_epoch_millis();
+        now < self.close_date_timestamp && now >= self.open_date_timestamp
+    }
+
+    pub(crate) fn are_sold_tokens_covered(&self) -> bool {
+        self.required_sold_token <= self.sold_tokens_for_buyers
+    }
+
+    // **************** 
+    // * Sale Asserts *
+    // **************** 
+
+    #[inline]
+    pub(crate) fn assert_min_deposit_amount(&self, amount: Balance) {
+        assert!(
+            amount >= self.payment_config.min_deposit_amount,
+            "minimum deposit amount is {}",
+            self.payment_config.min_deposit_amount
+        );
     }
 
     #[inline]
@@ -188,13 +207,27 @@ impl Sale {
         require!(get_current_epoch_millis() > self.close_date_timestamp);
     }
 
-    pub(crate) fn is_within_funding_period(&self) -> bool {
-        let now = get_current_epoch_millis();
-        now < self.close_date_timestamp && now >= self.open_date_timestamp
-    }
-
-    pub(crate) fn are_sold_tokens_covered(&self) -> bool {
-        self.required_sold_token <= self.sold_tokens_for_buyers
+    pub(crate) fn to_json(&self) -> SaleJSON {
+        SaleJSON {
+            id: self.id,
+            slug: self.slug.clone(),
+            sold_token_contract_address: self.sold_token_contract_address.clone(),
+            max_available_sold_token: U128::from(self.max_available_sold_token),
+            required_sold_token: U128::from(self.required_sold_token),
+            total_payment_token: U128::from(self.total_payment_token),
+            one_payment_token_purchase_rate: U128::from(self.one_payment_token_purchase_rate),
+            open_date_timestamp: U64::from(self.open_date_timestamp),
+            close_date_timestamp: U64::from(self.close_date_timestamp),
+            release_date_timestamp: U64::from(self.release_date_timestamp),
+            sold_tokens_for_buyers: U128::from(self.sold_tokens_for_buyers),
+            min_deposit_amount: U128::from(self.payment_config.min_deposit_amount),
+            payment_token_contract_address: self.payment_config.payment_token_contract_address.clone(),
+            payment_token_unit: U128::from(self.payment_config.payment_token_unit),
+            sale_fee: self.payment_config.sale_fee,
+            total_fees: U128::from(self.total_fees),
+            is_in_near: self.is_near_accepted(),
+            is_active: self.is_active()
+        }
     }
 }
 
@@ -211,5 +244,9 @@ impl KatherineSaleContract {
         self.sales
             .get(sale_id as u64)
             .expect("Unknown sale.")
+    }
+
+    pub(crate) fn remove_sale_from_active_list(&mut self, sale_id: u32) {
+        self.active_sales.remove(&sale_id);
     }
 }

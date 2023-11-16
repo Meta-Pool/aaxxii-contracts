@@ -66,13 +66,13 @@ impl KatherineSaleContract {
         sale.assert_within_funding_period();
 
         // For the payment token.
-        let new_deposit_amount = sale.get_deposits(buyer_id) + amount;
+        let new_deposit_amount = sale.get_buyer_deposit(buyer_id) + amount;
         sale.deposits.insert(buyer_id, &new_deposit_amount);
         sale.total_payment_token += amount;
 
         // For the sold token.
         let sold_tokens = sale.from_payment_to_sold_token(amount);
-        let new_claimable_amount = sale.get_claimable_sold_token_for_buyers(buyer_id) + sold_tokens;
+        let new_claimable_amount = sale.get_buyer_claimable_sold_token(buyer_id) + sold_tokens;
         sale.claimable_sold_token_for_buyers.insert(buyer_id, &new_claimable_amount);
         sale.required_sold_token += new_claimable_amount;
         require!(
