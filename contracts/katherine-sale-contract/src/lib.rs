@@ -89,31 +89,41 @@ impl KatherineSaleContract {
     // * Update contract settings *
     // ****************************
 
-    pub fn update_owner_id(&mut self, new_owner_id: AccountId) {
+    pub fn update_owner_id(&mut self, new_value: AccountId) {
         self.assert_only_owner();
-        self.owner_id = new_owner_id;
+        self.owner_id = new_value;
     }
 
+    pub fn update_treasury_id(&mut self, new_value: AccountId) {
+        self.assert_only_owner();
+        self.treasury_id = new_value;
+    }
+
+    /// This update will only affects the next sales, not currents.
     pub fn update_min_deposit_amount_in_near(&mut self, new_value: U128) {
         self.assert_only_owner();
         self.min_deposit_amount_in_near = new_value.0;
     }
 
+    /// This update will only affects the next sales, not currents.
     pub fn update_min_deposit_amount_in_payment_token(&mut self, new_value: U128) {
         self.assert_only_owner();
         self.min_deposit_amount_in_payment_token = new_value.0;
     }
 
+    /// This update will only affects the next sales, not currents.
     pub fn update_payment_token_contract_address(&mut self, new_value: AccountId) {
         self.assert_only_owner();
         self.payment_token_contract_address = new_value;
     }
 
+    /// This update will only affects the next sales, not currents.
     pub fn update_payment_token_unit(&mut self, new_value: U128) {
         self.assert_only_owner();
         self.payment_token_unit = new_value.0;
     }
 
+    /// This update will only affects the next sales, not currents.
     pub fn update_default_sales_fee(&mut self, new_value: BasisPoints) {
         self.assert_only_owner();
         check_basis_points(new_value);

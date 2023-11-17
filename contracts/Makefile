@@ -11,6 +11,9 @@ build:
 dev-deploy: build
 	./scripts/dev-deploy.sh
 
+dev-create-sale:
+	./scripts/dev-create-sale.sh
+
 test:
 	RUST_BACKTRACE=1 cargo test -- --color always --nocapture
 
