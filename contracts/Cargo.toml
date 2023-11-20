@@ -1,6 +1,16 @@
+[profile.release]
+codegen-units = 1
+# Tell `rustc` to optimize for small code size.
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true
+
 [workspace]
 members = [
 	"katherine-sale-contract",
 	"test-p-token"
 ]
 
+resolver = "2"
