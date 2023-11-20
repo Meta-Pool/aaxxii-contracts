@@ -1,6 +1,4 @@
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{BorshStorageKey, Gas, Balance, CryptoHash, StorageUsage};
-
+use near_sdk::{Gas, Balance};
 use crate::types::BasisPoints;
 
 pub const NEAR: Balance = 1_000_000_000_000_000_000_000_000;

@@ -1,6 +1,6 @@
 use crate::*;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{UnorderedMap, Vector};
+use near_sdk::collections::UnorderedMap;
 use near_sdk::{AccountId, require};
 
 use crate::constants::STORAGE_PER_SALE;
@@ -109,6 +109,15 @@ impl Sale {
             },
             total_fees: 0,
         }
+    }
+
+    /// The sale will only have a payment token if it's not denominated in NEAR.
+    pub(crate) fn get_payment_token(&self) -> AccountId {
+        self.payment_config.payment_token_contract_address.clone().unwrap()
+    }
+
+    pub(crate) fn get_sold_token(&self) -> AccountId {
+        self.sold_token_contract_address.clone()
     }
 
     pub(crate) fn assert_storage_is_covered() {
@@ -231,7 +240,6 @@ impl Sale {
     }
 }
 
-// #[near_bindgen]
 impl KatherineSaleContract {
     pub(crate) fn assert_unique_slug(&self, slug: &String) {
         assert!(

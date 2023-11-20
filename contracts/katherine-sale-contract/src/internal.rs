@@ -1,7 +1,5 @@
 use crate::*;
-// use crate::interface::*;
-use near_sdk::json_types::U128;
-use near_sdk::{near_bindgen, require};
+use near_sdk::require;
 
 impl KatherineSaleContract {
     #[inline]

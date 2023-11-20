@@ -1,7 +1,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet, Vector};
 use near_sdk::json_types::{U128, U64};
-use near_sdk::{require, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, PromiseResult, Promise};
+use near_sdk::{require, env, near_bindgen, AccountId, Balance, PanicOnDefault, PromiseResult, Promise};
 use std::convert::TryInto;
 
 use crate::buyer::*;
@@ -53,8 +53,8 @@ pub struct KatherineSaleContract {
     /// e.g. 1.0 USDT == 1_000_000 unit.
     pub payment_token_unit: u128,
     /// % of the total sale for the owner_id.
-    pub treasury_id: AccountId,
     pub sale_fee: BasisPoints,
+    pub treasury_id: AccountId,
 }
 
 #[near_bindgen]
@@ -252,14 +252,27 @@ impl KatherineSaleContract {
     // *******************
 
     /// Only callable during `stage 2 and 3`, only if sold tokens are covered.
+    /// Payments are being send to the `treasury_id`.
     pub fn collect_payments(&mut self, sale_id: u32) -> Promise {
         self.assert_only_owner();
         let mut sale = self.internal_get_sale(sale_id);
         sale.assert_after_close_period();
         self.remove_sale_from_active_list(sale_id);
-        require!(sale.are_sold_tokens_covered(), "Deposit all the sold tokens");
+        require!(sale.total_payment_token > 0, "Nothing to collect.");
+        require!(sale.are_sold_tokens_covered(), "Deposit all the sold tokens.");
 
         self.internal_collect_payments(&mut sale)
+    }
+
+    /// Only callable after the owner raw `collect_payments`.
+    /// Fees are being send to the `treasury_id`.
+    pub fn collect_fees(&mut self, sale_id: u32) -> Promise {
+        self.assert_only_owner();
+        let mut sale = self.internal_get_sale(sale_id);
+        sale.assert_after_close_period();
+        require!(sale.total_fees > 0, "Nothing to collect.");
+
+        self.internal_collect_fees(&mut sale)
     }
 
     pub fn withdraw_excess_sold_tokens(&mut self, sale_id: u32) -> Promise {
@@ -268,19 +281,20 @@ impl KatherineSaleContract {
         sale.assert_after_close_period();
         self.remove_sale_from_active_list(sale_id);
         
-        if sale.are_sold_tokens_covered() {
-            // check if sale has more token than what they need to cover deposits.
-            // return excess
+        let excess = if sale.are_sold_tokens_covered() {
+            // Check if sale has more tokens than what it needs to cover deposits.
+            // Return excess.
+            sale.sold_tokens_for_buyers - sale.required_sold_token
         } else {
             // IMPORTANT: If we're in stage 2, then seller can still deposit more sold
             // tokens to cover the deposits.
+            // Note how the `excess` here are the remaining amount of sold tokens.
             sale.assert_after_release_period();
-        }
+            sale.sold_tokens_for_buyers
+        };
 
-        unimplemented!();
+        self.seller_withdraw_excess_sold_tokens(excess, &mut sale)
     }
-
-    ////// TODO: implement the fee logic.
 
     // ********
     // * View *

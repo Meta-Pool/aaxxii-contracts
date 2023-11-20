@@ -1,7 +1,6 @@
 use crate::*;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{UnorderedMap, Vector};
-use near_sdk::{AccountId, require};
+use near_sdk::AccountId;
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Buyer {
@@ -17,10 +16,6 @@ impl Buyer {
                 }
             ),
         }
-    }
-
-    pub(crate) fn in_sale(&self, sale_id: u32) -> bool {
-        return self.supporting_sales.contains(&sale_id)
     }
 
     /// When the buyer.is_empty() it will be removed.
