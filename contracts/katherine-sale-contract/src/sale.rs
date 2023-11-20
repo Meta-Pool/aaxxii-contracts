@@ -208,12 +208,18 @@ impl Sale {
 
     #[inline]
     pub(crate) fn assert_after_release_period(&self) {
-        require!(get_current_epoch_millis() >= self.release_date_timestamp);
+        require!(
+            get_current_epoch_millis() >= self.release_date_timestamp,
+            "Only after release period."
+        );
     }
 
     #[inline]
     pub(crate) fn assert_after_close_period(&self) {
-        require!(get_current_epoch_millis() > self.close_date_timestamp);
+        require!(
+            get_current_epoch_millis() > self.close_date_timestamp,
+            "Only after close period."
+        );
     }
 
     pub(crate) fn to_json(&self) -> SaleJSON {

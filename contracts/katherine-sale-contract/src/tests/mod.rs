@@ -1,7 +1,7 @@
 use super::*;
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::json_types::{U64, U128};
-use near_sdk::serde_json;
+// use near_sdk::serde_json;
 use near_sdk::testing_env;
 use near_sdk::test_utils::{accounts, VMContextBuilder};
 
@@ -133,6 +133,106 @@ fn test_near_deposit() {
     assert_eq!(8 * NEAR, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
 }
 
+fn abstract_near_deposit() -> (VMContextBuilder, KatherineSaleContract) {
+    let mut context = get_context(owner_account());
+    testing_env!(context.build());
+    let mut contract = new_katherine_contract();
+
+    testing_env!(context
+        .predecessor_account_id(owner_account())
+        .attached_deposit(STORAGE_PER_SALE)
+        .build()
+    );
+    create_sale(&mut contract, "test-sale-1", true);
+
+    testing_env!(context
+        .predecessor_account_id(accounts(1))
+        .attached_deposit(3 * NEAR)
+        .block_timestamp(to_ts(0))
+        .build()
+    );
+    contract.purchase_token_with_near(0);
+
+    testing_env!(context
+        .predecessor_account_id(accounts(2))
+        .is_view(false)
+        .attached_deposit(1 * NEAR)
+        .block_timestamp(to_ts(1))
+        .build()
+    );
+    contract.purchase_token_with_near(0);
+
+    testing_env!(context
+        .predecessor_account_id(sold_token_contract())
+        .is_view(false)
+        // .attached_deposit(1 * NEAR)
+        .block_timestamp(to_ts(1))
+        .build()
+    );
+    contract.ft_on_transfer(accounts(3), U128::from(8 * NEAR), 0.to_string());
+
+    (context, contract)
+}
+
+#[test]
+#[should_panic(expected = "Only after close period.")]
+fn test_near_deposit_with_withdraws_fail_before_close() {
+    let (mut context, mut contract) = abstract_near_deposit();
+    
+    // Seller: withdraw payment tokens
+    testing_env!(context
+        .predecessor_account_id(owner_account())
+        .is_view(false)
+        // .attached_deposit(1 * NEAR)
+        .block_timestamp(to_ts(9))
+        .build()
+    );
+    contract.collect_payments(0);
+}
+
+#[test]
+fn test_near_deposit_with_withdraws() {
+    let (mut context, mut contract) = abstract_near_deposit();
+    
+    // Seller: withdraw payment tokens
+    testing_env!(context
+        .predecessor_account_id(owner_account())
+        .is_view(false)
+        // .attached_deposit(1 * NEAR)
+        .block_timestamp(to_ts(11))
+        .build()
+    );
+    contract.collect_payments(0);
+    testing_env!(context.is_view(true).build());
+    assert_eq!(8 * NEAR, contract.sales.get(0).unwrap().required_sold_token);
+    assert_eq!(8 * NEAR, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
+    assert_eq!(0, contract.sales.get(0).unwrap().total_payment_token);
+
+    // Deposit excessive sold tokens
+    testing_env!(context
+        .predecessor_account_id(sold_token_contract())
+        .is_view(false)
+        // .attached_deposit(1 * NEAR)
+        .block_timestamp(to_ts(12))
+        .build()
+    );
+    contract.ft_on_transfer(accounts(3), U128::from(2 * NEAR), 0.to_string());
+    assert_eq!(10 * NEAR, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
+
+    testing_env!(context
+        .predecessor_account_id(owner_account())
+        .is_view(false)
+        // .attached_deposit(1 * NEAR)
+        .block_timestamp(to_ts(13))
+        .build()
+    );
+    contract.withdraw_excess_sold_tokens(0);
+    testing_env!(context.is_view(true).build());
+    assert_eq!(8 * NEAR, contract.sales.get(0).unwrap().required_sold_token);
+    assert_eq!(8 * NEAR, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
+    assert_eq!(0, contract.sales.get(0).unwrap().total_payment_token);
+}
+
 #[test]
 fn test_usdt_deposit() {
     let mut context = get_context(owner_account());
@@ -187,6 +287,69 @@ fn test_usdt_deposit() {
     );
     contract.ft_on_transfer(accounts(3), U128::from(10 * NEAR), 0.to_string());
     assert_eq!(10 * NEAR, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
+}
+
+fn abstract_usdt_deposit() -> (VMContextBuilder, KatherineSaleContract) {
+    let mut context = get_context(owner_account());
+    testing_env!(context.build());
+    let mut contract = new_katherine_contract();
+
+    testing_env!(context
+        .predecessor_account_id(owner_account())
+        .attached_deposit(STORAGE_PER_SALE)
+        .build()
+    );
+    create_sale(&mut contract, "test-sale-1", false);
+
+    testing_env!(context
+        // .predecessor_account_id(accounts(1))
+        .predecessor_account_id(usdt_token_contract())
+        // .attached_deposit(3 * NEAR)
+        .block_timestamp(to_ts(0))
+        .build()
+    );
+    contract.ft_on_transfer(accounts(1), U128::from(4 * USDT_UNIT), 0.to_string());
+
+    testing_env!(context
+        // .predecessor_account_id(accounts(2))
+        .predecessor_account_id(usdt_token_contract())
+        .is_view(false)
+        // .attached_deposit(1 * NEAR)
+        .block_timestamp(to_ts(1))
+        .build()
+    );
+    contract.ft_on_transfer(accounts(2), U128::from(1 * USDT_UNIT), 0.to_string());
+
+    testing_env!(context
+        .predecessor_account_id(sold_token_contract())
+        .is_view(false)
+        // .attached_deposit(1 * NEAR)
+        .block_timestamp(to_ts(1))
+        .build()
+    );
+    contract.ft_on_transfer(accounts(3), U128::from(10 * NEAR), 0.to_string());
+    assert_eq!(10 * NEAR, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
+
+    (context, contract)
+}
+
+#[test]
+fn test_usdt_deposit_with_withdraws() {
+    let (mut context, mut contract) = abstract_usdt_deposit();
+    
+    // Seller: withdraw payment tokens
+    testing_env!(context
+        .predecessor_account_id(owner_account())
+        .is_view(false)
+        // .attached_deposit(1 * NEAR)
+        .block_timestamp(to_ts(11))
+        .build()
+    );
+    contract.collect_payments(0);
+    testing_env!(context.is_view(true).build());
+    assert_eq!(10 * NEAR, contract.sales.get(0).unwrap().required_sold_token);
+    assert_eq!(10 * NEAR, contract.sales.get(0).unwrap().sold_tokens_for_buyers);
+    assert_eq!(0, contract.sales.get(0).unwrap().total_payment_token);
 }
 
 #[test]
