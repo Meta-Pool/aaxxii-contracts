@@ -12,3 +12,6 @@ near-units = "0.2.0"
 serde_json = "1.0"
 tokio = { version = "1.14", features = ["full"] }
 near-workspaces = { version = "0.8.0" }
+katherine-sale-contract = { path = "../contracts/katherine-sale-contract" }
+meta-test-utils = { path = "../contracts/meta-test-utils" }
+near-gas = { version = "0.2.3", features = ["serde", "borsh", "schemars"] }

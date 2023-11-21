@@ -10,7 +10,8 @@ overflow-checks = true
 [workspace]
 members = [
 	"katherine-sale-contract",
-	"test-p-token"
+	"test-p-token",
+	"meta-test-utils"
 ]
 
 resolver = "2"
