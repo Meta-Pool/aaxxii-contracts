@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
 
     let test_utils_contract = create_test_utils(&worker).await?;
     let sold_token_contract = create_sold_token(&owner, &worker).await?;
-    let usdc_token_contract = create_usdc_token(&owner, &worker).await?;
+    let usdc_token_contract = create_usdc_token(&owner, &buyer, &worker).await?;
     let katherine_contract = create_katherine(
         &owner,
         &treasury,
@@ -72,6 +72,19 @@ async fn main() -> anyhow::Result<()> {
         &buyer,
     ).await?;
     println!("Registering Accounts.: {:?}\n", res);
+
+    // Transfering USDC to buyer.
+    let res = owner
+        .call(usdc_token_contract.id(), "ft_transfer")
+        .args_json(serde_json::json!({
+            "receiver_id": buyer.id(),
+            "amount": "10000000", // 10 usdc
+        }))
+        .deposit(NearToken::from_yoctonear(1))
+        .transact()
+        .await?;
+    println!("RES::: {:?}", res);
+    assert!(false);
 
     // ***************************
     // * Stage 2: Creating Sales *
@@ -194,6 +207,17 @@ async fn main() -> anyhow::Result<()> {
     // sold_tokens_for_buyers
 
     // near call <ft-contract> ft_transfer_call '{"receiver_id": "<receiver-contract>", "amount": "<amount>", "msg": "<a-string-message>"}' --accountId <user_account_id> --depositYocto 1
+    let outcome = buyer
+        .call(katherine_contract.id(), "purchase_token_with_near")
+        .args_json(json!({
+            "sale_id": 0,
+        }))
+        .deposit(NearToken::from_near(10))
+        .gas(NearGas::from_tgas(300))
+        .transact()
+        .await?;
+    println!("purchase_token_with_near #0: {:#?}", outcome);
+    assert!(outcome.is_success());
 
     Ok(())
 }
@@ -237,6 +261,7 @@ async fn create_sold_token(
 
 async fn create_usdc_token(
     owner: &Account,
+    buyer: &Account,
     worker: &Worker<impl DevNetwork>,
 ) -> anyhow::Result<Contract> {
     let usdc_token_contract_wasm = std::fs::read(PTOKEN_FILEPATH)?;
