@@ -3,10 +3,18 @@
 // use katherine_sale_contract::utils::proportional;
 use near_units::{parse_gas, parse_near};
 // use json;
-// use std::str;
+use std::str;
 // use meta_tools::bond::BondLoaderJSON;
-// use near_sdk::json_types::{U128, U64};
-use near_sdk::AccountId as NearAccountId;
+use near_sdk::json_types::{U128, U64};
+// use near_sdk::AccountId as NearAccountId;
+
+// use katherine_sale_contract::constants::STORAGE_PER_SALE;
+// use crate::constants::STORAGE_PER_SALE;
+pub const STORAGE_PER_SALE: u128 = NEAR / 100;
+
+use near_workspaces::result::ExecutionFinalResult;
+// use near_workspaces::types::NearToken;
+use near_workspaces::types::NearToken;
 
 // // use workspaces::network::Sandbox;
 use near_workspaces::{Account, AccountId, Contract, Worker, DevNetwork};
@@ -16,7 +24,7 @@ use near_gas::NearGas;
 // use workspaces::error::Error as WorkspaceError;
 
 use meta_test_utils::now::Now;
-use meta_test_utils::now;
+// use meta_test_utils::now;
 
 // macro allowing us to convert args into JSON bytes to be read by the contract.
 use serde_json::json;
@@ -65,6 +73,128 @@ async fn main() -> anyhow::Result<()> {
     ).await?;
     println!("Registering Accounts.: {:?}\n", res);
 
+    // ***************************
+    // * Stage 2: Creating Sales *
+    // ***************************
+
+    let outcome = create_sale(
+        0,
+        true,
+        &now,
+        &owner,
+        &katherine_contract,
+        &sold_token_contract
+    ).await?;
+    println!("create_sale #0 outcome: {:#?}", outcome);
+    assert!(outcome.is_success());
+    let outcome = &outcome.raw_bytes().unwrap().clone();
+    let id = str::from_utf8(outcome).unwrap();
+    assert_eq!(id, 0.to_string());
+
+    let outcome: serde_json::Value = katherine_contract
+        .call("get_number_of_sales")
+        .view()
+        .await?
+        .json()?;
+    let n = outcome.as_u64().unwrap();
+    assert_eq!(n, 1u64);
+
+    let outcome: serde_json::Value = katherine_contract
+        .call("get_active_sales")
+        .args_json(serde_json::json!({
+            "from_index": 0,
+            "limit": 10
+        }))
+        .view()
+        .await?
+        .json()?;
+    let sales = outcome.as_array().unwrap();
+    assert_eq!(1, sales.len());
+
+    let outcome = create_sale(
+        1,
+        false,
+        &now,
+        &owner,
+        &katherine_contract,
+        &sold_token_contract
+    ).await?;
+    println!("create_sale #1 outcome: {:#?}", outcome);
+    assert!(outcome.is_success(), "Cannot split bond.");
+
+    let outcome = &outcome.raw_bytes().unwrap().clone();
+    let id = str::from_utf8(outcome).unwrap();
+    assert_eq!(id, 1.to_string());
+
+    let outcome: serde_json::Value = katherine_contract
+        .call("get_number_of_sales")
+        .view()
+        .await?
+        .json()?;
+    let n = outcome.as_u64().unwrap();
+    assert_eq!(n, 2u64);
+
+    let outcome: serde_json::Value = katherine_contract
+        .call("get_active_sales")
+        .args_json(serde_json::json!({
+            "from_index": 0,
+            "limit": 10
+        }))
+        .view()
+        .await?
+        .json()?;
+    let sales = outcome.as_array().unwrap();
+    assert_eq!(2, sales.len());
+
+    // **************************
+    // * Stage 3: Buying tokens *
+    // **************************
+
+    let _ = print_time_status(&katherine_contract, &test_utils_contract).await?;
+    worker.fast_forward(500).await?;
+    let _ = print_time_status(&katherine_contract, &test_utils_contract).await?;
+
+    // purchase_token_with_near(&mut self, sale_id: u32)
+    let outcome = buyer
+        .call(katherine_contract.id(), "purchase_token_with_near")
+        .args_json(json!({
+            "sale_id": 0,
+        }))
+        .deposit(NearToken::from_near(10))
+        .gas(NearGas::from_tgas(300))
+        .transact()
+        .await?;
+    println!("purchase_token_with_near #0: {:#?}", outcome);
+    assert!(outcome.is_success());
+
+    let outcome: serde_json::Value = katherine_contract
+        .call("get_sale")
+        .args_json(serde_json::json!({
+            "sale_id": 0
+        }))
+        .view()
+        .await?
+        .json()?;
+    let sale = outcome.as_object().unwrap();
+    assert_eq!(
+        NearToken::from_near(10 * 2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        sale["required_sold_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        NearToken::from_near(10).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        sale["total_payment_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        0,
+        sale["sold_tokens_for_buyers"].as_str().unwrap().parse::<u64>().unwrap()
+    );
+
+    // required_sold_token
+    // total_payment_token
+    // sold_tokens_for_buyers
+
+    // near call <ft-contract> ft_transfer_call '{"receiver_id": "<receiver-contract>", "amount": "<amount>", "msg": "<a-string-message>"}' --accountId <user_account_id> --depositYocto 1
+
     Ok(())
 }
 
@@ -96,7 +226,7 @@ async fn create_sold_token(
             "owner_id": owner.id(),
             "decimals": 24,
             "symbol": "pTOKEN",
-            "total_supply": format!("{}", parse_near!("1000 N"))
+            "total_supply": format!("{}", NearToken::from_near(1000).as_yoctonear())
         }))
         .transact()
         .await?;
@@ -118,7 +248,7 @@ async fn create_usdc_token(
             "owner_id": owner.id(),
             "decimals": 6,
             "symbol": "USDC",
-            "total_supply": format!("{}", parse_near!("1000 N"))
+            "total_supply": format!("{}", NearToken::from_near(1000).as_yoctonear())
         }))
         .transact()
         .await?;
@@ -140,7 +270,7 @@ async fn create_katherine(
         .call("new")
         .args_json(serde_json::json!({
             "owner_id": owner.id(),
-            "min_deposit_amount_in_near": format!("{}", parse_near!("1 N")),
+            "min_deposit_amount_in_near": format!("{}", NearToken::from_near(1).as_yoctonear()),
             "min_deposit_amount_in_payment_token": "1000000", // 1 USDC
             "payment_token_contract_address": usdc_token,
             "payment_token_unit": "1000000",
@@ -215,6 +345,85 @@ async fn registering_accounts(
         .gas(NearGas::from_tgas(200))
         .transact()
         .await?;
+
+    Ok(())
+}
+
+async fn create_sale(
+    n: u32,
+    is_in_near: bool,
+    now: &Now,
+    owner: &Account,
+    katherine_contract: &Contract,
+    sold_token_contract: &Contract,
+) -> anyhow::Result<ExecutionFinalResult> {
+
+    let one_payment_token_purchase_rate = U128::from(NearToken::from_near(2).as_yoctonear());
+    let max_available_sold_token = U128::from(NearToken::from_near(100).as_yoctonear());
+    let open_date_timestamp = U64::from(now.increment_min(2).to_epoch_millis());
+    let close_date_timestamp = U64::from(now.increment_min(4).to_epoch_millis());
+    let release_date_timestamp = U64::from(now.increment_min(6).to_epoch_millis());
+
+    let outcome = owner
+        .call(katherine_contract.id(), "create_sale")
+        .args_json(json!({
+            "slug": format!("test-sale-{}", n),
+            "is_in_near": is_in_near,
+            "sold_token_contract_address": sold_token_contract.id(),
+            "one_payment_token_purchase_rate": one_payment_token_purchase_rate,
+            "max_available_sold_token": max_available_sold_token,
+            "open_date_timestamp": open_date_timestamp,
+            "close_date_timestamp": close_date_timestamp,
+            "release_date_timestamp": release_date_timestamp,
+        }))
+        .deposit(NearToken::from_yoctonear(STORAGE_PER_SALE-1))
+        .gas(NearGas::from_tgas(300))
+        .transact()
+        .await?;
+    assert!(outcome.is_failure());
+
+    let outcome = owner
+        .call(katherine_contract.id(), "create_sale")
+        .args_json(json!({
+            "slug": format!("test-sale-{}", n),
+            "is_in_near": is_in_near,
+            "sold_token_contract_address": sold_token_contract.id(),
+            "one_payment_token_purchase_rate": one_payment_token_purchase_rate,
+            "max_available_sold_token": max_available_sold_token,
+            "open_date_timestamp": open_date_timestamp,
+            "close_date_timestamp": close_date_timestamp,
+            "release_date_timestamp": release_date_timestamp,
+        }))
+        .deposit(NearToken::from_yoctonear(STORAGE_PER_SALE))
+        .gas(NearGas::from_tgas(300))
+        .transact()
+        .await?;
+
+    Ok(outcome)
+}
+
+async fn print_time_status(
+    katherine_contract: &Contract,
+    test_utils_contract: &Contract,
+) -> anyhow::Result<()> {
+    let outcome: serde_json::Value = katherine_contract
+        .call("get_sale")
+        .args_json(serde_json::json!({
+            "sale_id": 0
+        }))
+        .view()
+        .await?
+        .json()?;
+    let sale = outcome.as_object().unwrap();
+
+    let now = Now::new_from_epoch_millis(test_utils_contract.call("get_now").view().await?.json()?);
+    println!("NOW    : {:?}", now.to_epoch_millis());
+    let ts = sale["open_date_timestamp"].as_str().unwrap().parse::<u64>().unwrap();
+    println!("OPEN   : {:?}{}", ts, if ts < now.to_epoch_millis() { "*" } else { "" });
+    let ts = sale["close_date_timestamp"].as_str().unwrap().parse::<u64>().unwrap();
+    println!("CLOSE  : {:?}{}", ts, if ts < now.to_epoch_millis() { "*" } else { "" });
+    let ts = sale["release_date_timestamp"].as_str().unwrap().parse::<u64>().unwrap();
+    println!("RELEASE: {:?}{}", ts, if ts < now.to_epoch_millis() { "*" } else { "" });
 
     Ok(())
 }
