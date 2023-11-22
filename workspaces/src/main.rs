@@ -431,6 +431,7 @@ async fn main() -> anyhow::Result<()> {
     worker.fast_forward(500).await?;
     let _ = print_time_status(&katherine_contract, &test_utils_contract).await?;
 
+    // Treasury don't purchased any sold-tokens; only the buyer.
     let outcome = treasury
         .call(katherine_contract.id(), "withdraw_tokens")
         .args_json(serde_json::json!({
@@ -440,14 +441,80 @@ async fn main() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(outcome.is_failure());
+    // println!("Buyer gets sold-tokens 🏦: {:#?}", outcome);
+
+    let outcome: serde_json::Value = sold_token_contract
+        .call("ft_balance_of")
+        .args_json(serde_json::json!({
+            "account_id": buyer.id()
+        }))
+        .view()
+        .await?
+        .json()?;
+    let buyer_original_balance = outcome.as_str().unwrap().parse::<u128>().unwrap();
+
+    let outcome = buyer
+        .call(katherine_contract.id(), "withdraw_tokens")
+        .args_json(serde_json::json!({
+            "sale_id": 0
+        }))
+        // .deposit(NearToken::from_yoctonear(1))
+        .gas(NearGas::from_tgas(300))
+        .transact()
+        .await?;
+    // assert!(outcome.is_failure());
     println!("Buyer gets sold-tokens 🏦: {:#?}", outcome);
-    // let treasury_new_balance = treasury.view_account().await?.balance;
-    // // Get se sale earnings without the 2.5% of fee.
-    // assert_eq!(
-    //     treasury_new_balance.as_yoctonear(),
-    //     treasury_original_balance.as_yoctonear()
-    //     + NearToken::from_near(10).as_yoctonear()
-    // );
+
+    let outcome: serde_json::Value = sold_token_contract
+        .call("ft_balance_of")
+        .args_json(serde_json::json!({
+            "account_id": buyer.id()
+        }))
+        .view()
+        .await?
+        .json()?;
+    let buyer_new_balance = outcome.as_str().unwrap().parse::<u128>().unwrap();
+
+    println!("old: {} \nnew: {}", buyer_original_balance, buyer_new_balance);
+    assert_eq!(buyer_original_balance, 0);
+    assert_eq!(buyer_new_balance, NearToken::from_near(10 * 2).as_yoctonear());
+
+    // ------RETURNING PAYMENT TOKENS---------
+    let outcome: serde_json::Value = usdc_token_contract
+        .call("ft_balance_of")
+        .args_json(serde_json::json!({
+            "account_id": buyer.id()
+        }))
+        .view()
+        .await?
+        .json()?;
+    let buyer_original_balance = outcome.as_str().unwrap().parse::<u128>().unwrap();
+
+    let outcome = buyer
+        .call(katherine_contract.id(), "withdraw_tokens")
+        .args_json(serde_json::json!({
+            "sale_id": 1
+        }))
+        // .deposit(NearToken::from_yoctonear(1))
+        .gas(NearGas::from_tgas(300))
+        .transact()
+        .await?;
+    // assert!(outcome.is_failure());
+    println!("Buyer gets sold-tokens 🏦: {:#?}", outcome);
+
+    let outcome: serde_json::Value = usdc_token_contract
+        .call("ft_balance_of")
+        .args_json(serde_json::json!({
+            "account_id": buyer.id()
+        }))
+        .view()
+        .await?
+        .json()?;
+    let buyer_new_balance = outcome.as_str().unwrap().parse::<u128>().unwrap();
+
+    println!("old: {} \nnew: {}", buyer_original_balance, buyer_new_balance);
+    assert_eq!(buyer_original_balance, 0);
+    assert_eq!(buyer_new_balance, 10000000);
 
     // ***********************************
     // * Stage 7: Seller withdraw excess *
