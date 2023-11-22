@@ -354,9 +354,100 @@ async fn main() -> anyhow::Result<()> {
 
     println!("old: {} \nnew: {}", treasury_original_balance, treasury_new_balance);
 
+    let outcome: serde_json::Value = katherine_contract
+        .call("get_sale")
+        .args_json(serde_json::json!({
+            "sale_id": 0
+        }))
+        .view()
+        .await?
+        .json()?;
+    let sale = outcome.as_object().unwrap();
+    assert_eq!(
+        NearToken::from_near(10 * 2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        sale["required_sold_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        0,
+        sale["total_payment_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        NearToken::from_millinear(250).as_yoctonear(),
+        sale["total_fees"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        NearToken::from_near(10 * 3).as_yoctonear(),
+        sale["sold_tokens_for_buyers"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+
+    let outcome = owner
+        .call(katherine_contract.id(), "collect_fees")
+        .args_json(serde_json::json!({
+            "sale_id": 0
+        }))
+        // .deposit(NearToken::from_yoctonear(1))
+        .transact()
+        .await?;
+    println!("Collect payments 🏦: {:#?}", outcome);
+    let treasury_new_balance = treasury.view_account().await?.balance;
+    // Get se sale earnings without the 2.5% of fee.
+    assert_eq!(
+        treasury_new_balance.as_yoctonear(),
+        treasury_original_balance.as_yoctonear()
+        + NearToken::from_near(10).as_yoctonear()
+    );
+
+    let outcome: serde_json::Value = katherine_contract
+        .call("get_sale")
+        .args_json(serde_json::json!({
+            "sale_id": 0
+        }))
+        .view()
+        .await?
+        .json()?;
+    let sale = outcome.as_object().unwrap();
+    assert_eq!(
+        NearToken::from_near(10 * 2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        sale["required_sold_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        0,
+        sale["total_payment_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        0,
+        sale["total_fees"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        NearToken::from_near(10 * 3).as_yoctonear(),
+        sale["sold_tokens_for_buyers"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+
     // **************************************
     // * Stage 6: Buyer Withdraw sold token *
     // **************************************
+
+    let _ = print_time_status(&katherine_contract, &test_utils_contract).await?;
+    worker.fast_forward(500).await?;
+    let _ = print_time_status(&katherine_contract, &test_utils_contract).await?;
+
+    let outcome = treasury
+        .call(katherine_contract.id(), "withdraw_tokens")
+        .args_json(serde_json::json!({
+            "sale_id": 0
+        }))
+        // .deposit(NearToken::from_yoctonear(1))
+        .transact()
+        .await?;
+    assert!(outcome.is_failure());
+    println!("Buyer gets sold-tokens 🏦: {:#?}", outcome);
+    // let treasury_new_balance = treasury.view_account().await?.balance;
+    // // Get se sale earnings without the 2.5% of fee.
+    // assert_eq!(
+    //     treasury_new_balance.as_yoctonear(),
+    //     treasury_original_balance.as_yoctonear()
+    //     + NearToken::from_near(10).as_yoctonear()
+    // );
 
     // ***********************************
     // * Stage 7: Seller withdraw excess *
