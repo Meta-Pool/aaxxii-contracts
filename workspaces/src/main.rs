@@ -261,7 +261,7 @@ async fn main() -> anyhow::Result<()> {
         .call(sold_token_contract.id(), "ft_transfer_call")
         .args_json(json!({
             "receiver_id": katherine_contract.id(),
-            "amount": U128::from(NearToken::from_near(2*10).as_yoctonear()),
+            "amount": U128::from(NearToken::from_near(3*10).as_yoctonear()),
             "msg": "0"
         }))
         .deposit(NearToken::from_yoctonear(1))
@@ -288,7 +288,7 @@ async fn main() -> anyhow::Result<()> {
         sale["total_payment_token"].as_str().unwrap().parse::<u128>().unwrap()
     );
     assert_eq!(
-        NearToken::from_near(10 * 2).as_yoctonear(),
+        NearToken::from_near(10 * 3).as_yoctonear(),
         sale["sold_tokens_for_buyers"].as_str().unwrap().parse::<u128>().unwrap()
     );
 
@@ -325,6 +325,42 @@ async fn main() -> anyhow::Result<()> {
         NearToken::from_near(10).as_yoctonear(),
         sale["sold_tokens_for_buyers"].as_str().unwrap().parse::<u128>().unwrap()
     );
+
+    // ******************************
+    // * Stage 5: Withdraw payments *
+    // ******************************
+
+    let _ = print_time_status(&katherine_contract, &test_utils_contract).await?;
+    worker.fast_forward(500).await?;
+    let _ = print_time_status(&katherine_contract, &test_utils_contract).await?;
+
+    let treasury_original_balance = treasury.view_account().await?.balance;
+    let outcome = owner
+        .call(katherine_contract.id(), "collect_payments")
+        .args_json(serde_json::json!({
+            "sale_id": 0
+        }))
+        // .deposit(NearToken::from_yoctonear(1))
+        .transact()
+        .await?;
+    println!("Collect payments 🏦: {:#?}", outcome);
+    let treasury_new_balance = treasury.view_account().await?.balance;
+    // Get se sale earnings without the 2.5% of fee.
+    assert_eq!(
+        treasury_new_balance.as_yoctonear(),
+        treasury_original_balance.as_yoctonear()
+        + NearToken::from_millinear(9750).as_yoctonear()
+    );
+
+    println!("old: {} \nnew: {}", treasury_original_balance, treasury_new_balance);
+
+    // **************************************
+    // * Stage 6: Buyer Withdraw sold token *
+    // **************************************
+
+    // ***********************************
+    // * Stage 7: Seller withdraw excess *
+    // ***********************************
 
     println!("All tests passed ✅");
     Ok(())
