@@ -1,7 +1,7 @@
 // use std::fs;
 // use katherine_sale_contract::types::{EpochMillis, VaultId};
 // use katherine_sale_contract::utils::proportional;
-use near_units::{parse_gas, parse_near};
+// use near_units::{parse_gas, parse_near};
 // use json;
 use std::str;
 // use meta_tools::bond::BondLoaderJSON;
@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
 
     let test_utils_contract = create_test_utils(&worker).await?;
     let sold_token_contract = create_sold_token(&owner, &worker).await?;
-    let usdc_token_contract = create_usdc_token(&owner, &buyer, &worker).await?;
+    let usdc_token_contract = create_usdc_token(&owner, &worker).await?;
     let katherine_contract = create_katherine(
         &owner,
         &treasury,
@@ -73,8 +73,8 @@ async fn main() -> anyhow::Result<()> {
     ).await?;
     println!("Registering Accounts.: {:?}\n", res);
 
-    // Transfering USDC to buyer.
-    let res = owner
+    // Transferring USDC to buyer.
+    let _ = owner
         .call(usdc_token_contract.id(), "ft_transfer")
         .args_json(serde_json::json!({
             "receiver_id": buyer.id(),
@@ -83,8 +83,6 @@ async fn main() -> anyhow::Result<()> {
         .deposit(NearToken::from_yoctonear(1))
         .transact()
         .await?;
-    println!("RES::: {:?}", res);
-    assert!(false);
 
     // ***************************
     // * Stage 2: Creating Sales *
@@ -202,23 +200,133 @@ async fn main() -> anyhow::Result<()> {
         sale["sold_tokens_for_buyers"].as_str().unwrap().parse::<u64>().unwrap()
     );
 
-    // required_sold_token
-    // total_payment_token
-    // sold_tokens_for_buyers
-
+    // This first call must fail because it's pointing to the incorrect sale_id.
     // near call <ft-contract> ft_transfer_call '{"receiver_id": "<receiver-contract>", "amount": "<amount>", "msg": "<a-string-message>"}' --accountId <user_account_id> --depositYocto 1
     let outcome = buyer
-        .call(katherine_contract.id(), "purchase_token_with_near")
+        .call(usdc_token_contract.id(), "ft_transfer_call")
         .args_json(json!({
-            "sale_id": 0,
+            "receiver_id": katherine_contract.id(),
+            "amount": "10000000", // 10 USDC
+            "msg": "0"
         }))
-        .deposit(NearToken::from_near(10))
+        .deposit(NearToken::from_yoctonear(1))
         .gas(NearGas::from_tgas(300))
         .transact()
         .await?;
-    println!("purchase_token_with_near #0: {:#?}", outcome);
+    println!("ft_transfer_call #0: {:#?}", outcome);
+    // Due to Workspaces nuances, this is the way to see if a receipt in the tx failed.
+    assert!(outcome.is_success() && outcome.receipt_failures().len() == 1, "Incorrect payment token");
+
+    let outcome = buyer
+        .call(usdc_token_contract.id(), "ft_transfer_call")
+        .args_json(json!({
+            "receiver_id": katherine_contract.id(),
+            "amount": "10000000", // 10 USDC
+            "msg": "1"
+        }))
+        .deposit(NearToken::from_yoctonear(1))
+        .gas(NearGas::from_tgas(300))
+        .transact()
+        .await?;
+    println!("ft_transfer_call #1: {:#?}", outcome);
     assert!(outcome.is_success());
 
+    let outcome: serde_json::Value = katherine_contract
+        .call("get_sale")
+        .args_json(serde_json::json!({
+            "sale_id": 1
+        }))
+        .view()
+        .await?
+        .json()?;
+    let sale = outcome.as_object().unwrap();
+    assert_eq!(
+        NearToken::from_near(10 * 2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        sale["required_sold_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        10_000_000_u128,
+        sale["total_payment_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        0,
+        sale["sold_tokens_for_buyers"].as_str().unwrap().parse::<u64>().unwrap()
+    );
+
+    // **********************************************************
+    // * Stage 4: Seller delivers for sale 0 but not for sale 1 *
+    // **********************************************************
+
+    let outcome = owner
+        .call(sold_token_contract.id(), "ft_transfer_call")
+        .args_json(json!({
+            "receiver_id": katherine_contract.id(),
+            "amount": U128::from(NearToken::from_near(2*10).as_yoctonear()),
+            "msg": "0"
+        }))
+        .deposit(NearToken::from_yoctonear(1))
+        .gas(NearGas::from_tgas(300))
+        .transact()
+        .await?;
+    println!("Transferring sold tokens for sale 0: {:#?}", outcome);
+
+    let outcome: serde_json::Value = katherine_contract
+        .call("get_sale")
+        .args_json(serde_json::json!({
+            "sale_id": 0
+        }))
+        .view()
+        .await?
+        .json()?;
+    let sale = outcome.as_object().unwrap();
+    assert_eq!(
+        NearToken::from_near(10 * 2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        sale["required_sold_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        NearToken::from_near(10).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        sale["total_payment_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        NearToken::from_near(10 * 2).as_yoctonear(),
+        sale["sold_tokens_for_buyers"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+
+    let _ = owner
+        .call(sold_token_contract.id(), "ft_transfer_call")
+        .args_json(json!({
+            "receiver_id": katherine_contract.id(),
+            "amount": U128::from(NearToken::from_near(10).as_yoctonear()),
+            "msg": "1"
+        }))
+        .deposit(NearToken::from_yoctonear(1))
+        .gas(NearGas::from_tgas(300))
+        .transact()
+        .await?;
+
+    let outcome: serde_json::Value = katherine_contract
+        .call("get_sale")
+        .args_json(serde_json::json!({
+            "sale_id": 1
+        }))
+        .view()
+        .await?
+        .json()?;
+    let sale = outcome.as_object().unwrap();
+    assert_eq!(
+        NearToken::from_near(10 * 2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        sale["required_sold_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        10_000_000_u128,
+        sale["total_payment_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        NearToken::from_near(10).as_yoctonear(),
+        sale["sold_tokens_for_buyers"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+
+    println!("All tests passed ✅");
     Ok(())
 }
 
@@ -228,7 +336,7 @@ async fn create_test_utils(
     let test_utils_contract_wasm = std::fs::read(TEST_UTILS_FILEPATH)?;
     let test_utils_contract = worker.dev_deploy(&test_utils_contract_wasm).await?;
 
-    let res = test_utils_contract
+    let _ = test_utils_contract
         .call("new")
         .args_json(serde_json::json!({}))
         .transact()
@@ -261,7 +369,6 @@ async fn create_sold_token(
 
 async fn create_usdc_token(
     owner: &Account,
-    buyer: &Account,
     worker: &Worker<impl DevNetwork>,
 ) -> anyhow::Result<Contract> {
     let usdc_token_contract_wasm = std::fs::read(PTOKEN_FILEPATH)?;
