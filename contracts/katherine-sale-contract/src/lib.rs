@@ -1,7 +1,10 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet, Vector};
 use near_sdk::json_types::{U128, U64};
-use near_sdk::{require, env, near_bindgen, AccountId, Balance, PanicOnDefault, PromiseResult, Promise};
+use near_sdk::{
+    require, env, assert_one_yocto, near_bindgen, AccountId, Balance,
+    PanicOnDefault, PromiseResult, Promise
+};
 use std::convert::TryInto;
 
 use crate::buyer::*;
@@ -89,42 +92,56 @@ impl KatherineSaleContract {
     // * Update contract settings *
     // ****************************
 
+    #[payable]
     pub fn update_owner_id(&mut self, new_value: AccountId) {
+        assert_one_yocto();
         self.assert_only_owner();
         self.owner_id = new_value;
     }
 
+    #[payable]
     pub fn update_treasury_id(&mut self, new_value: AccountId) {
+        assert_one_yocto();
         self.assert_only_owner();
         self.treasury_id = new_value;
     }
 
     /// This update will only affects the next sales, not currents.
+    #[payable]
     pub fn update_min_deposit_amount_in_near(&mut self, new_value: U128) {
+        assert_one_yocto();
         self.assert_only_owner();
         self.min_deposit_amount_in_near = new_value.0;
     }
 
     /// This update will only affects the next sales, not currents.
+    #[payable]
     pub fn update_min_deposit_amount_in_payment_token(&mut self, new_value: U128) {
+        assert_one_yocto();
         self.assert_only_owner();
         self.min_deposit_amount_in_payment_token = new_value.0;
     }
 
     /// This update will only affects the next sales, not currents.
+    #[payable]
     pub fn update_payment_token_contract_address(&mut self, new_value: AccountId) {
+        assert_one_yocto();
         self.assert_only_owner();
         self.payment_token_contract_address = new_value;
     }
 
     /// This update will only affects the next sales, not currents.
+    #[payable]
     pub fn update_payment_token_unit(&mut self, new_value: U128) {
+        assert_one_yocto();
         self.assert_only_owner();
         self.payment_token_unit = new_value.0;
     }
 
     /// This update will only affects the next sales, not currents.
+    #[payable]
     pub fn update_default_sales_fee(&mut self, new_value: BasisPoints) {
+        assert_one_yocto();
         self.assert_only_owner();
         check_basis_points(new_value);
         self.sale_fee = new_value;
