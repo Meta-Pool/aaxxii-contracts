@@ -11,7 +11,7 @@ overflow-checks = true
 members = [
 	"katherine-sale-contract",
 	"test-p-token",
-	"meta-test-utils"
+	"test-utils"
 ]
 
 resolver = "2"

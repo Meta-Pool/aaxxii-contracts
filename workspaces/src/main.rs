@@ -23,15 +23,14 @@ use near_gas::NearGas;
 // use workspaces::result::ExecutionFinalResult;
 // use workspaces::error::Error as WorkspaceError;
 
-use meta_test_utils::now::Now;
-// use meta_test_utils::now;
+use test_utils::now::Now;
 
 // macro allowing us to convert args into JSON bytes to be read by the contract.
 use serde_json::json;
 
 const KATHERINE_SALE_FILEPATH: &str = "./res/katherine_sale_contract.wasm";
 const PTOKEN_FILEPATH: &str = "./res/test_p_token.wasm";
-const TEST_UTILS_FILEPATH: &str = "./res/meta_test_utils.wasm";
+const TEST_UTILS_FILEPATH: &str = "./res/test_utils.wasm";
 
 pub const NEAR: u128 = 1_000_000_000_000_000_000_000_000;
 
