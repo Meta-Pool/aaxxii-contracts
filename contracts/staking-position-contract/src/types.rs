@@ -2,6 +2,8 @@ use uint::construct_uint;
 use near_sdk::{AccountId, Balance};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::json_types::U128;
+use near_sdk::{BorshStorageKey, Gas, CryptoHash};
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 
 pub type VoterId = AccountId;
 pub type VotingPower = u128;
@@ -15,6 +17,22 @@ pub type PositionIndex = u64;
 construct_uint! {
     /// 256-bit unsigned integer.
     pub struct U256(4);
+}
+
+#[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)]
+pub enum StorageKey {
+    LockingPosition { hash_id: CryptoHash },
+    VotePosition { hash_id: CryptoHash },
+    Stakers,
+    Votes,
+    ContractVotes { hash_id: CryptoHash },
+    VoterVotes { hash_id: CryptoHash },
+
+    ClaimableNear,
+    AvailableFt,
+    ClaimableFt,
+    AccumFt,
+    UnclaimedFt,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

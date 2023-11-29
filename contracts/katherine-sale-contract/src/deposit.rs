@@ -74,7 +74,7 @@ impl KatherineSaleContract {
         let sold_tokens = sale.from_payment_to_sold_token(amount);
         let new_claimable_amount = sale.get_buyer_claimable_sold_token(buyer_id) + sold_tokens;
         sale.claimable_sold_token_for_buyers.insert(buyer_id, &new_claimable_amount);
-        sale.required_sold_token += new_claimable_amount;
+        sale.required_sold_token = new_claimable_amount;
         require!(
             sale.required_sold_token <= sale.max_available_sold_token,
             "Not enough token for sale."

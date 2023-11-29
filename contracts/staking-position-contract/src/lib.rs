@@ -37,23 +37,16 @@ pub struct StakingPositionContract {
     pub max_voting_positions: u8,
     pub aaxxii_token_contract_address: AccountId,
 
-    /// Stakers can claim NEAR
+    /// Stakers can claim NEAR.
     pub claimable_near: UnorderedMap<VoterId, u128>,
     pub accum_near_distributed_for_claims: u128, // accumulated total NEAR distributed
     pub total_unclaimed_near: u128,              // currently unclaimed META
 
-    /// Stakers can claim 
-    pub available_claimable_ft: UnorderedSet<AccountId>,
-
-    // added v0.1.4
-    pub stnear_token_contract_address: ContractAddress,
-    pub claimable_stnear: UnorderedMap<VoterId, u128>,
-    pub accum_distributed_stnear_for_claims: u128, // accumulated total stNEAR distributed
-    pub total_unclaimed_stnear: u128,              // currently unclaimed stNEAR
-
-    // airdrop users encrypted data
-    pub registration_cost: u128,
-    pub airdrop_user_data: UnorderedMap<VoterId, String>,
+    /// Stakers can claim any FT token.
+    pub available_claimable_ft_addresses: UnorderedSet<AccountId>,
+    pub claimable_ft: UnorderedMap<AccountId, UnorderedMap<VoterId, u128>>,
+    pub accum_ft_distributed_for_claims: UnorderedMap<AccountId, u128>,
+    pub total_unclaimed_ft: UnorderedMap<AccountId, u128>,
 }
 
 #[near_bindgen]
@@ -66,36 +59,41 @@ impl StakingPositionContract {
         min_deposit_amount: U128,
         max_locking_positions: u8,
         max_voting_positions: u8,
-        meta_token_contract_address: ContractAddress,
-        stnear_token_contract_address: ContractAddress,
+        meta_token_contract_address: AccountId,
+        aaxxii_token_contract_address: AccountId,
         registration_cost: U128,
+        available_claimable_ft_addresses: Vec<AccountId>,
     ) -> Self {
-        require!(!env::state_exists(), "The contract is already initialized");
+        // require!(!env::state_exists(), "The contract is already initialized");
         require!(
-            min_locking_period < max_locking_period,
+            min_locking_period <= max_locking_period,
             "Review the min and max locking period"
         );
-        Self {
+        let mut contract = Self {
             owner_id,
-            voters: UnorderedMap::new(StorageKey::Voters),
+            stakers: UnorderedMap::new(StorageKey::Stakers),
+            total_voting_power: 0,
             votes: UnorderedMap::new(StorageKey::Votes),
             min_locking_period,
             max_locking_period,
-            min_deposit_amount: Meta::from(min_deposit_amount),
+            min_deposit_amount: min_deposit_amount.0,
             max_locking_positions,
             max_voting_positions,
-            meta_token_contract_address,
-            total_voting_power: 0,
-            accumulated_distributed_for_claims: 0,
-            total_unclaimed_meta: 0,
-            claimable_meta: UnorderedMap::new(StorageKey::Claimable),
-            stnear_token_contract_address,
-            claimable_stnear: UnorderedMap::new(StorageKey::ClaimableStNear),
-            accum_distributed_stnear_for_claims: 0,
-            total_unclaimed_stnear: 0,
-            registration_cost: registration_cost.0,
-            airdrop_user_data: UnorderedMap::new(StorageKey::AirdropData),
+            aaxxii_token_contract_address,
+            claimable_near: UnorderedMap::new(StorageKey::ClaimableNear),
+            accum_near_distributed_for_claims: 0,
+            total_unclaimed_near: 0,
+            available_claimable_ft_addresses: UnorderedSet::new(StorageKey::AvailableFt),
+            claimable_ft: UnorderedMap::new(StorageKey::ClaimableFt),
+            accum_ft_distributed_for_claims: UnorderedMap::new(StorageKey::AccumFt),
+            total_unclaimed_ft: UnorderedMap::new(StorageKey::UnclaimedFt),
+        };
+
+        for address in available_claimable_ft_addresses.iter() {
+            contract.available_claimable_ft_addresses.insert(address);
         }
+
+        contract
     }
 
     // ***************
