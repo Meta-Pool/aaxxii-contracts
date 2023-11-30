@@ -4,7 +4,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::unordered_map::UnorderedMap;
 use near_sdk::collections::{Vector, UnorderedSet};
 use near_sdk::json_types::{U128, U64};
-use near_sdk::{env, log, near_bindgen, require, AccountId, Balance, PanicOnDefault};
+use near_sdk::{assert_one_yocto, env, log, near_bindgen, require, AccountId, Balance, PanicOnDefault};
 use types::*;
 use utils::{generate_hash_id, get_current_epoch_millis};
 use staker::{Staker, StakerJSON};
@@ -96,129 +96,75 @@ impl StakingPositionContract {
         contract
     }
 
-    // ***************
-    // * owner config
-    // ***************
-    pub fn set_stnear_contract(&mut self, stnear_contract: AccountId) {
-        self.assert_only_owner();
-        self.stnear_token_contract_address = stnear_contract;
-    }
-
-    // *******************************
-    // * Register for Airdrops/Gifts *
-    // *******************************
-
-    pub fn update_registration_cost(&mut self, new_cost: U128) {
-        self.assert_only_owner();
-        self.registration_cost = new_cost.0;
-    }
-
-    pub fn get_registration_cost(&self) -> U128 {
-        U128::from(self.registration_cost)
-    }
-
-    pub fn check_if_user_is_registerd(&self, account_id: &AccountId) -> bool {
-        self.airdrop_user_data.get(account_id).is_some()
-    }
+    // ****************************
+    // * Update contract settings *
+    // ****************************
 
     #[payable]
-    pub fn update_airdrop_user_data(&mut self, encrypted_data: &String) {
-        assert!(
-            env::attached_deposit() == self.registration_cost,
-            "Pay {} yoctos for the registration cost",
-            self.registration_cost
-        );
-        self.airdrop_user_data
-            .insert(&env::predecessor_account_id(), encrypted_data);
-    }
-
-    /// Returns a single airdrop data
-    pub fn get_airdrop_account(&self, account_id: &AccountId) -> String {
-        self.airdrop_user_data.get(&account_id).unwrap()
-    }
-
-    /// Returns a list of airdrop data
-    pub fn get_airdrop_accounts(&self, from_index: u32, limit: u32) -> Vec<(String, String)> {
-        let keys = self.airdrop_user_data.keys_as_vector();
-        let voters_len = keys.len() as u64;
-        let start = from_index as u64;
-        let limit = limit as u64;
-        let mut results = Vec::<(String, String)>::new();
-        for index in start..std::cmp::min(start + limit, voters_len) {
-            let voter_id = keys.get(index).unwrap();
-            let airdrop_data = self.airdrop_user_data.get(&voter_id).unwrap();
-            results.push((voter_id.to_string(), airdrop_data));
-        }
-        results
+    pub fn set_aaxxii_contract(&mut self, new_value: AccountId) {
+        assert_one_yocto();
+        self.assert_only_owner();
+        self.aaxxii_token_contract_address = new_value;
     }
 
     // ****************
     // * claim & Lock *
     // ****************
 
-    // claim META and create/update a locking position
-    pub fn claim_and_lock(&mut self, amount: U128, locking_period: u16) {
-        let amount = amount.0;
-        self.assert_min_deposit_amount(amount);
-        let voter_id = VoterId::from(env::predecessor_account_id());
-        self.remove_claimable_meta(&voter_id, amount);
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
-        // create/update locking position
-        self.deposit_locking_position(amount, locking_period, voter_id, &mut voter);
-    }
+    /// users will only claim?
 
-    // claim stNear
-    pub fn claim_stnear(&mut self, amount: U128) {
-        let amount = amount.0;
-        let voter_id = VoterId::from(env::predecessor_account_id());
-        self.remove_claimable_stnear(&voter_id, amount);
+    // // claim META and create/update a locking position
+    // pub fn claim_and_lock(&mut self, amount: U128, locking_period: u16) {
+    //     let amount = amount.0;
+    //     self.assert_min_deposit_amount(amount);
+    //     let voter_id = VoterId::from(env::predecessor_account_id());
+    //     self.remove_claimable_meta(&voter_id, amount);
+    //     let mut voter = self.internal_get_voter_or_panic(&voter_id);
+    //     // create/update locking position
+    //     self.deposit_locking_position(amount, locking_period, voter_id, &mut voter);
+    // }
 
-        // IMPORTANT: if user is not a voter, then the claim is not available.
-        let _voter = self.internal_get_voter_or_panic(&voter_id);
-        self.transfer_stnear_to_voter(voter_id, amount);
-    }
+    // // claim stNear
+    // pub fn claim_stnear(&mut self, amount: U128) {
+    //     let amount = amount.0;
+    //     let voter_id = VoterId::from(env::predecessor_account_id());
+    //     self.remove_claimable_stnear(&voter_id, amount);
 
-    pub fn fix_user(&mut self, amount: U128, account: AccountId) {
-        self.assert_only_owner();
-        self.add_claimable_stnear(&account, amount.0);
-    }
+    //     // IMPORTANT: if user is not a voter, then the claim is not available.
+    //     let _voter = self.internal_get_voter_or_panic(&voter_id);
+    //     self.transfer_stnear_to_voter(voter_id, amount);
+    // }
 
     // *************
     // * Unlocking *
     // *************
 
     pub fn unlock_position(&mut self, index: PositionIndex) {
-        let voter_id = env::predecessor_account_id();
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
-        let mut locking_position = voter.get_position(index);
+        let mut staker = self.internal_get_staker_or_panic();
+        let mut locking_position = staker.get_position(index);
 
         let voting_power = locking_position.voting_power;
         assert!(
-            voter.voting_power >= voting_power,
+            staker.voting_power >= voting_power,
             "Not enough free voting power to unlock! You have {}, required {}.",
-            voter.voting_power,
+            staker.voting_power,
             voting_power
         );
 
-        log!(
-            "UNLOCK: {} unlocked position {}.",
-            &voter_id.to_string(),
-            index
-        );
+        log!("UNLOCK: {} unlocked position {}.", &staker.id, index);
         locking_position.unlocking_started_at = Some(get_current_epoch_millis());
-        voter.locking_positions.replace(index, &locking_position);
-        voter.voting_power -= voting_power;
+        staker.locking_positions.replace(index, &locking_position);
+        staker.voting_power -= voting_power;
         self.total_voting_power = self.total_voting_power.saturating_sub(voting_power);
-        self.voters.insert(&voter_id, &voter);
+        self.stakers.insert(&staker.id, &staker);
     }
 
     pub fn unlock_partial_position(&mut self, index: PositionIndex, amount: U128) {
-        let voter_id = env::predecessor_account_id();
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
-        let mut locking_position = voter.get_position(index);
+        let mut staker = self.internal_get_staker_or_panic();
+        let mut locking_position = staker.get_position(index);
 
         let locking_period = locking_position.locking_period;
-        let amount = Meta::from(amount);
+        let amount = amount.0;
 
         // If the amount equals the total, then the unlock is not partial.
         if amount == locking_position.amount {
@@ -238,38 +184,37 @@ impl StakingPositionContract {
             remove_voting_power
         );
         assert!(
-            voter.voting_power >= remove_voting_power,
+            staker.voting_power >= remove_voting_power,
             "Not enough free voting power to unlock! You have {}, required {}.",
-            voter.voting_power,
+            staker.voting_power,
             remove_voting_power
         );
 
-        log!(
-            "UNLOCK: {} partially unlocked position {}.",
-            &voter_id.to_string(),
-            index
-        );
+        log!("UNLOCK: {} partially unlocked position {}.", &staker.id, index);
         // Create a NEW unlocking position
-        self.create_unlocking_position(&mut voter, amount, locking_period, remove_voting_power);
+        self.create_unlocking_position(&mut staker, amount, locking_period, remove_voting_power);
 
         // Decrease current locking position
         locking_position.voting_power -= remove_voting_power;
         locking_position.amount -= amount;
-        voter.locking_positions.replace(index, &locking_position);
+        staker.locking_positions.replace(index, &locking_position);
 
-        voter.voting_power -= remove_voting_power;
+        staker.voting_power -= remove_voting_power;
         self.total_voting_power = self.total_voting_power.saturating_sub(remove_voting_power);
-        self.voters.insert(&voter_id, &voter);
+        self.stakers.insert(&staker.id, &staker);
     }
 
     // ********************************
     // * extend locking position days *
     // ********************************
 
-    pub fn locking_position_extend_days(&mut self, index: PositionIndex, new_locking_period: Days) {
-        let voter_id = env::predecessor_account_id();
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
-        let mut locking_position = voter.get_position(index);
+    pub fn locking_position_extend_days(
+        &mut self,
+        index: PositionIndex,
+        new_locking_period: Days
+    ) {
+        let mut staker = self.internal_get_staker_or_panic();
+        let mut locking_position = staker.get_position(index);
 
         // position should be locked
         require!(
@@ -283,7 +228,7 @@ impl StakingPositionContract {
 
         log!(
             "EXTEND-TIME: {} position #{} {} days",
-            &voter_id.to_string(),
+            &staker.id,
             index,
             new_locking_period
         );
@@ -296,15 +241,15 @@ impl StakingPositionContract {
         self.total_voting_power += new_voting_power - old_voting_power;
 
         // update to new voter-voting-power (add delta)
-        voter.voting_power += new_voting_power - old_voting_power;
+        staker.voting_power += new_voting_power - old_voting_power;
 
         // update position
         locking_position.locking_period = new_locking_period;
         locking_position.voting_power = new_voting_power;
 
         // save
-        voter.locking_positions.replace(index, &locking_position);
-        self.voters.insert(&voter_id, &voter);
+        staker.locking_positions.replace(index, &locking_position);
+        self.stakers.insert(&staker.id, &staker);
     }
 
     // ***********
@@ -317,16 +262,15 @@ impl StakingPositionContract {
         locking_period: Days,
         amount_from_balance: U128,
     ) {
-        let voter_id = env::predecessor_account_id();
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
-        let locking_position = voter.get_position(index);
+        let mut staker = self.internal_get_staker_or_panic();
+        let locking_position = staker.get_position(index);
 
         // Check voter balance and unlocking position amount.
         let amount_from_balance = amount_from_balance.0;
         assert!(
-            voter.balance >= amount_from_balance,
+            staker.balance >= amount_from_balance,
             "Not enough balance. You have {} META in balance, required {}.",
-            voter.balance,
+            staker.balance,
             amount_from_balance
         );
         // Check if position is unlocking.
@@ -349,35 +293,32 @@ impl StakingPositionContract {
             );
         }
 
-        log!(
-            "RELOCK: {} relocked position {}.",
-            &voter_id.to_string(),
-            index
-        );
+        log!("RELOCK: {} relocked position {}.", &staker.id, index);
         let amount = locking_position.amount + amount_from_balance;
-        voter.remove_position(index);
-        voter.balance -= amount_from_balance;
-        self.deposit_locking_position(amount, locking_period, voter_id, &mut voter);
+        staker.remove_position(index);
+        staker.balance -= amount_from_balance;
+        self.deposit_locking_position(amount, locking_period, &mut staker);
     }
 
+    // TODO: here you can unify the amount from position and from balance.
     pub fn relock_partial_position(
         &mut self,
         index: PositionIndex,
         amount_from_position: U128,
+        amount: U128,
         locking_period: Days,
         amount_from_balance: U128,
     ) {
-        let voter_id = env::predecessor_account_id();
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
-        let mut locking_position = voter.get_position(index);
+        let mut staker = self.internal_get_staker_or_panic();
+        let mut locking_position = staker.get_position(index);
 
         // Check voter balance and unlocking position amount.
         let amount_from_balance = amount_from_balance.0;
         let amount_from_position = amount_from_position.0;
         assert!(
-            voter.balance >= amount_from_balance,
+            staker.balance >= amount_from_balance,
             "Not enough balance. You have {} META in balance, required {}.",
-            voter.balance,
+            staker.balance,
             amount_from_balance
         );
         assert!(
@@ -420,30 +361,25 @@ impl StakingPositionContract {
             assert!(new_amount > 0, "Use relock_position() function instead.");
 
             locking_position.amount = new_amount;
-            voter.locking_positions.replace(index, &locking_position);
+            staker.locking_positions.replace(index, &locking_position);
         } else {
-            voter.balance += locking_position.amount - amount_from_position;
-            voter.remove_position(index);
+            staker.balance += locking_position.amount - amount_from_position;
+            staker.remove_position(index);
         }
 
-        log!(
-            "RELOCK: {} partially relocked position {}.",
-            &voter_id.to_string(),
-            index
-        );
-        voter.balance -= amount_from_balance;
-        self.deposit_locking_position(amount, locking_period, voter_id, &mut voter);
+        log!("RELOCK: {} partially relocked position {}.", &staker.id, index);
+        staker.balance -= amount_from_balance;
+        self.deposit_locking_position(amount, locking_period, &mut staker);
     }
 
     pub fn relock_from_balance(&mut self, locking_period: Days, amount_from_balance: U128) {
-        let voter_id = env::predecessor_account_id();
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
+        let mut staker = self.internal_get_staker_or_panic();
 
         let amount = amount_from_balance.0;
         assert!(
-            voter.balance >= amount,
+            staker.balance >= amount,
             "Not enough balance. You have {} META in balance, required {}.",
-            voter.balance,
+            staker.balance,
             amount
         );
         assert!(
@@ -452,9 +388,9 @@ impl StakingPositionContract {
             self.min_deposit_amount
         );
 
-        log!("RELOCK: {} relocked position.", &voter_id.to_string());
-        voter.balance -= amount;
-        self.deposit_locking_position(amount, locking_period, voter_id, &mut voter);
+        log!("RELOCK: {} relocked position.", &staker.id);
+        staker.balance -= amount;
+        self.deposit_locking_position(amount, locking_period, &mut staker);
     }
 
     // ******************
@@ -464,78 +400,79 @@ impl StakingPositionContract {
     // clear SEVERAL locking positions
     pub fn clear_locking_position(&mut self, position_index_list: Vec<PositionIndex>) {
         require!(position_index_list.len() > 0, "Index list is empty.");
-        let voter_id = env::predecessor_account_id();
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
+        let mut staker = self.internal_get_staker_or_panic();
         let mut position_index_list = position_index_list;
 
         position_index_list.sort();
         position_index_list.reverse();
         for index in position_index_list {
-            let locking_position = voter.get_position(index);
+            let locking_position = staker.get_position(index);
             if locking_position.is_unlocked() {
-                voter.balance += locking_position.amount;
-                voter.remove_position(index);
+                staker.balance += locking_position.amount;
+                staker.remove_position(index);
             }
         }
-        self.voters.insert(&voter_id, &voter);
+        self.stakers.insert(&staker.id, &staker);
     }
 
     // ************
     // * Withdraw *
     // ************
 
-    pub fn withdraw(&mut self, position_index_list: Vec<PositionIndex>, amount_from_balance: U128) {
-        let voter_id = env::predecessor_account_id();
-        let voter = self.internal_get_voter_or_panic(&voter_id);
-        let amount_from_balance = Meta::from(amount_from_balance);
+    pub fn withdraw(
+        &mut self,
+        position_index_list: Vec<PositionIndex>,
+        amount_from_balance: U128
+    ) {
+        let staker = self.internal_get_staker_or_panic();
+        let amount_from_balance = amount_from_balance.0;
         assert!(
-            voter.balance >= amount_from_balance,
+            staker.balance >= amount_from_balance,
             "Not enough balance. You have {} META in balance, required {}.",
-            voter.balance,
+            staker.balance,
             amount_from_balance
         );
-        let remaining_balance = voter.balance - amount_from_balance;
+        let remaining_balance = staker.balance - amount_from_balance;
         // Clear locking positions, it can increase the voter balance.
         if position_index_list.len() > 0 {
             self.clear_locking_position(position_index_list);
         }
         // get voter again, because clear_locking_position alters the state
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
-        let total_to_withdraw = voter.balance - remaining_balance;
+        let mut staker = self.internal_get_staker_or_panic();
+        let total_to_withdraw = staker.balance - remaining_balance;
         require!(total_to_withdraw > 0, "Nothing to withdraw.");
-        voter.balance -= total_to_withdraw;
+        staker.balance -= total_to_withdraw;
 
-        if voter.is_empty() {
-            self.voters.remove(&voter_id);
-            log!("GODSPEED: {} is no longer part of Meta Vote!", &voter_id);
+        if staker.is_empty() {
+            self.stakers.remove(&staker.id);
+            log!("GODSPEED: {} is no longer part of Meta Vote!", &staker.id);
         } else {
-            self.voters.insert(&voter_id, &voter);
+            self.stakers.insert(&staker.id, &staker);
         }
-        self.transfer_meta_to_voter(voter_id, total_to_withdraw);
+        self.transfer_meta_to_voter(staker.id, total_to_withdraw);
     }
 
     pub fn withdraw_all(&mut self) {
-        let voter_id = env::predecessor_account_id();
-        let voter = self.internal_get_voter_or_panic(&voter_id);
+        let staker = self.internal_get_staker_or_panic();
 
-        let position_index_list = voter.get_unlocked_position_index();
+        let position_index_list = staker.get_unlocked_position_index();
         // Clear locking positions could increase the voter balance.
         if position_index_list.len() > 0 {
             self.clear_locking_position(position_index_list);
         }
         // get voter again because clear locking positions could increase the voter balance.
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
-        let total_to_withdraw = voter.balance;
+        let mut staker = self.internal_get_staker_or_panic();
+        let total_to_withdraw = staker.balance;
         require!(total_to_withdraw > 0, "Nothing to withdraw.");
-        voter.balance = 0;
+        staker.balance = 0;
 
-        if voter.is_empty() {
-            self.voters.remove(&voter_id);
-            log!("GODSPEED: {} is no longer part of Meta Vote!", &voter_id);
+        if staker.is_empty() {
+            self.stakers.remove(&staker.id);
+            log!("GODSPEED: {} is no longer part of Meta Vote!", &staker.id);
         } else {
-            self.voters.insert(&voter_id, &voter);
+            self.stakers.insert(&staker.id, &staker);
         }
-        self.transfer_meta_to_voter(voter_id, total_to_withdraw);
+        self.transfer_meta_to_voter(staker.id, total_to_withdraw);
     }
 
     // **********
@@ -548,35 +485,35 @@ impl StakingPositionContract {
         contract_address: ContractAddress,
         votable_object_id: VotableObjId,
     ) {
-        let voter_id = env::predecessor_account_id();
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
+        let mut staker = self.internal_get_staker_or_panic();
         let voting_power = VotingPower::from(voting_power);
         assert!(
-            voter.voting_power >= voting_power,
+            staker.voting_power >= voting_power,
             "Not enough free voting power. You have {}, requested {}.",
-            voter.voting_power,
+            staker.voting_power,
             voting_power
         );
         assert!(
-            voter.vote_positions.len() <= self.max_voting_positions as u64,
+            staker.vote_positions.len() <= self.max_voting_positions as u64,
             "Cannot exceed {} voting positions.",
             self.max_voting_positions
         );
 
-        let mut votes_for_address = voter.get_votes_for_address(&voter_id, &contract_address);
+        let mut votes_for_address = staker.get_votes_for_address(
+            &staker.id,
+            &contract_address
+        );
         let mut votes = votes_for_address.get(&votable_object_id).unwrap_or(0_u128);
 
-        voter.voting_power -= voting_power;
+        staker.voting_power -= voting_power;
         votes += voting_power;
         votes_for_address.insert(&votable_object_id, &votes);
-        voter
-            .vote_positions
-            .insert(&contract_address, &votes_for_address);
-        self.voters.insert(&voter_id, &voter);
+        staker.vote_positions.insert(&contract_address, &votes_for_address);
+        self.stakers.insert(&staker.id, &staker);
 
         log!(
             "VOTE: {} gave {} votes for object {} at address {}.",
-            &voter_id,
+            &staker.id,
             voting_power.to_string(),
             &votable_object_id,
             contract_address.as_str()
@@ -592,11 +529,10 @@ impl StakingPositionContract {
         contract_address: ContractAddress,
         votable_object_id: VotableObjId,
     ) {
-        let voter_id = env::predecessor_account_id();
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
+        let mut staker = self.internal_get_staker_or_panic();
         let voting_power = VotingPower::from(voting_power);
 
-        let mut votes_for_address = voter.get_votes_for_address(&voter_id, &contract_address);
+        let mut votes_for_address = staker.get_votes_for_address(&staker.id, &contract_address);
         let mut votes = votes_for_address
             .get(&votable_object_id)
             .expect("Rebalance not allowed for nonexisting Votable Object.");
@@ -613,17 +549,17 @@ impl StakingPositionContract {
             // Increase votes.
             let additional_votes = voting_power - votes;
             assert!(
-                voter.voting_power >= additional_votes,
+                staker.voting_power >= additional_votes,
                 "Not enough free voting power to unlock! You have {}, required {}.",
-                voter.voting_power,
+                staker.voting_power,
                 additional_votes
             );
-            voter.voting_power -= additional_votes;
+            staker.voting_power -= additional_votes;
             votes += additional_votes;
 
             log!(
                 "VOTE: {} increased to {} votes for object {} at address {}.",
-                &voter_id,
+                &staker.id,
                 voting_power.to_string(),
                 &votable_object_id,
                 contract_address.as_str()
@@ -637,12 +573,12 @@ impl StakingPositionContract {
         } else {
             // Decrease votes.
             let remove_votes = votes - voting_power;
-            voter.voting_power += remove_votes;
+            staker.voting_power += remove_votes;
             votes -= remove_votes;
 
             log!(
                 "VOTE: {} decreased to {} votes for object {} at address {}.",
-                &voter_id,
+                &staker.id,
                 voting_power.to_string(),
                 &votable_object_id,
                 contract_address.as_str()
@@ -651,36 +587,34 @@ impl StakingPositionContract {
             self.internal_decrease_total_votes(remove_votes, &contract_address, &votable_object_id);
         }
         votes_for_address.insert(&votable_object_id, &votes);
-        voter
-            .vote_positions
-            .insert(&contract_address, &votes_for_address);
-        self.voters.insert(&voter_id, &voter);
+        staker.vote_positions.insert(&contract_address, &votes_for_address);
+        self.stakers.insert(&staker.id, &staker);
     }
 
     pub fn unvote(&mut self, contract_address: ContractAddress, votable_object_id: VotableObjId) {
-        let voter_id = env::predecessor_account_id();
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
-
-        let mut votes_for_address = voter.get_votes_for_address(&voter_id, &contract_address);
+        let mut staker = self.internal_get_staker_or_panic();
+        let mut votes_for_address = staker.get_votes_for_address(
+            &staker.id,
+            &contract_address
+        );
         let votes = votes_for_address
             .get(&votable_object_id)
             .expect("Cannot unvote a Votable Object without votes.");
 
-        voter.voting_power += votes;
+        staker.voting_power += votes;
         votes_for_address.remove(&votable_object_id);
 
         if votes_for_address.is_empty() {
-            voter.vote_positions.remove(&contract_address);
+            staker.vote_positions.remove(&contract_address);
         } else {
-            voter
-                .vote_positions
+            staker.vote_positions
                 .insert(&contract_address, &votes_for_address);
         }
-        self.voters.insert(&voter_id, &voter);
+        self.stakers.insert(&staker.id, &staker);
 
         log!(
             "UNVOTE: {} unvoted object {} at address {}.",
-            &voter_id,
+            &staker.id,
             &votable_object_id,
             contract_address.as_str()
         );
@@ -706,8 +640,8 @@ impl StakingPositionContract {
         self.owner_id.to_string()
     }
 
-    pub fn get_voters_count(&self) -> U64 {
-        self.voters.len().into()
+    pub fn get_voters_count(&self) -> u32 {
+        self.stakers.len().try_into().unwrap()
     }
 
     pub fn get_total_voting_power(&self) -> U128 {
@@ -715,73 +649,78 @@ impl StakingPositionContract {
     }
 
     // get all information for a single voter: voter + locking-positions + voting-positions
-    pub fn get_voter_info(&self, voter_id: &AccountId) -> VoterJSON {
-        let voter = self.voters.get(&voter_id).unwrap();
-        voter.to_json(voter_id)
+    pub fn get_staker_info(&self, account_id: AccountId) -> StakerJSON {
+        self.stakers.get(&account_id).unwrap().to_json()
     }
 
     // get all information for multiple voters, by index: Vec<voter + locking-positions + voting-positions>
-    pub fn get_voters(&self, from_index: u32, limit: u32) -> Vec<VoterJSON> {
-        let keys = self.voters.keys_as_vector();
+    pub fn get_stakers(&self, from_index: u32, limit: u32) -> Vec<StakerJSON> {
+        let keys = self.stakers.keys_as_vector();
         let voters_len = keys.len() as u64;
         let start = from_index as u64;
         let limit = limit as u64;
 
-        let mut results = Vec::<VoterJSON>::new();
+        let mut results = Vec::<StakerJSON>::new();
         for index in start..std::cmp::min(start + limit, voters_len) {
-            let voter_id = keys.get(index).unwrap();
-            let voter = self.voters.get(&voter_id).unwrap();
-            results.push(voter.to_json(&voter_id));
+            let staker_id = keys.get(index).unwrap();
+            let staker = self.stakers.get(&staker_id).unwrap();
+            results.push(staker.to_json());
         }
         results
     }
 
-    pub fn get_balance(&self, voter_id: VoterId) -> U128 {
-        let voter = self.internal_get_voter(&voter_id);
-        let balance = voter.balance + voter.sum_unlocked();
+    pub fn get_balance(&self, account_id: AccountId) -> U128 {
+        let staker = self.internal_get_staker(account_id);
+        let balance = staker.balance + staker.sum_unlocked();
         U128::from(balance)
     }
 
-    pub fn get_claimable_meta(&self, voter_id: &VoterId) -> U128 {
-        U128::from(self.claimable_meta.get(&voter_id).unwrap_or_default())
+    pub fn get_claimable_near(&self, account_id: AccountId) -> U128 {
+        U128::from(self.claimable_near.get(&account_id).unwrap_or(0))
     }
 
-    pub fn get_claimable_stnear(&self, voter_id: &VoterId) -> U128 {
-        U128::from(self.claimable_stnear.get(&voter_id).unwrap_or_default())
+    pub fn get_claimable_ft(&self, voter_id: AccountId, ft_id: AccountId) -> U128 {
+        U128::from(
+            self.claimable_ft.get(&ft_id)
+                .expect("Invalid ft token")
+                .get(&voter_id)
+                .unwrap_or(0)
+        )
     }
 
     // get all claims
-    pub fn get_claims(&self, from_index: u32, limit: u32) -> Vec<(AccountId, U128)> {
+    // TODO: We need an ft get all claims?
+    pub fn get_near_claims(&self, from_index: u32, limit: u32) -> Vec<(AccountId, U128)> {
         let mut results = Vec::<(AccountId, U128)>::new();
-        let keys = self.claimable_meta.keys_as_vector();
+        let keys = self.claimable_near.keys_as_vector();
         let start = from_index as u64;
         let limit = limit as u64;
         for index in start..std::cmp::min(start + limit, keys.len()) {
             let voter_id = keys.get(index).unwrap();
-            let amount = self.claimable_meta.get(&voter_id).unwrap();
+            let amount = self.claimable_near.get(&voter_id).unwrap();
             results.push((voter_id, amount.into()));
         }
         results
     }
 
-    pub fn get_locked_balance(&self, voter_id: VoterId) -> U128 {
-        let voter = self.internal_get_voter(&voter_id);
-        U128::from(voter.sum_locked())
+    pub fn get_locked_balance(&self, account_id: AccountId) -> U128 {
+        let staker = self.internal_get_staker(account_id);
+        U128::from(staker.sum_locked())
     }
 
-    pub fn get_unlocking_balance(&self, voter_id: VoterId) -> U128 {
-        let voter = self.internal_get_voter(&voter_id);
-        U128::from(voter.sum_unlocking())
+    pub fn get_unlocking_balance(&self, account_id: AccountId) -> U128 {
+        let staker = self.internal_get_staker(account_id);
+        U128::from(staker.sum_unlocking())
     }
 
-    pub fn get_available_voting_power(&self, voter_id: VoterId) -> U128 {
-        let voter = self.internal_get_voter(&voter_id);
-        U128::from(voter.voting_power)
+    pub fn get_available_voting_power(&self, account_id: AccountId) -> U128 {
+        let staker = self.internal_get_staker(account_id);
+        U128::from(staker.voting_power)
     }
 
-    pub fn get_used_voting_power(&self, voter_id: VoterId) -> U128 {
-        let voter = self.internal_get_voter(&voter_id);
-        U128::from(voter.sum_used_votes())
+    pub fn get_used_voting_power(&self, account_id: AccountId) -> U128 {
+        let staker = self.internal_get_staker(account_id);
+        U128::from(staker.sum_used_votes())
     }
 
     pub fn get_locking_period(&self) -> (Days, Days) {
@@ -789,12 +728,14 @@ impl StakingPositionContract {
     }
 
     // all locking positions for a voter
-    pub fn get_all_locking_positions(&self, voter_id: VoterId) -> Vec<LockingPositionJSON> {
+    pub fn get_all_locking_positions(
+        &self,
+        account_id: AccountId
+    ) -> Vec<LockingPositionJSON> {
         let mut result = Vec::new();
-        let voter = self.internal_get_voter(&voter_id);
-        for index in 0..voter.locking_positions.len() {
-            let locking_position = voter
-                .locking_positions
+        let staker = self.internal_get_staker(account_id);
+        for index in 0..staker.locking_positions.len() {
+            let locking_position = staker.locking_positions
                 .get(index)
                 .expect("Locking position not found!");
             result.push(locking_position.to_json(Some(index)));
@@ -805,10 +746,10 @@ impl StakingPositionContract {
     pub fn get_locking_position(
         &self,
         index: PositionIndex,
-        voter_id: VoterId,
+        account_id: AccountId,
     ) -> Option<LockingPositionJSON> {
-        let voter = self.internal_get_voter(&voter_id);
-        match voter.locking_positions.get(index) {
+        let staker = self.internal_get_staker(account_id);
+        match staker.locking_positions.get(index) {
             Some(locking_position) => Some(locking_position.to_json(Some(index))),
             None => None,
         }
@@ -850,11 +791,11 @@ impl StakingPositionContract {
     }
 
     // given a voter, total votes per app + object_id
-    pub fn get_votes_by_voter(&self, voter_id: VoterId) -> Vec<VotableObjectJSON> {
+    pub fn get_votes_by_voter(&self, account_id: AccountId) -> Vec<VotableObjectJSON> {
         let mut results: Vec<VotableObjectJSON> = Vec::new();
-        let voter = self.internal_get_voter(&voter_id);
-        for contract_address in voter.vote_positions.keys_as_vector().iter() {
-            let votes_for_address = voter.vote_positions.get(&contract_address).unwrap();
+        let staker = self.internal_get_staker(account_id);
+        for contract_address in staker.vote_positions.keys_as_vector().iter() {
+            let votes_for_address = staker.vote_positions.get(&contract_address).unwrap();
             for (id, voting_power) in votes_for_address.iter() {
                 results.push(VotableObjectJSON {
                     votable_contract: contract_address.to_string(),
@@ -869,12 +810,12 @@ impl StakingPositionContract {
 
     pub fn get_votes_for_object(
         &self,
-        voter_id: VoterId,
+        account_id: AccountId,
         contract_address: ContractAddress,
         votable_object_id: VotableObjId,
     ) -> U128 {
-        let voter = self.internal_get_voter(&voter_id);
-        let votes = match voter.vote_positions.get(&contract_address) {
+        let staker = self.internal_get_staker(account_id);
+        let votes = match staker.vote_positions.get(&contract_address) {
             Some(votes_for_address) => votes_for_address.get(&votable_object_id).unwrap_or(0_u128),
             None => 0_u128,
         };
@@ -883,11 +824,15 @@ impl StakingPositionContract {
 
     // query current meta ready for distribution
     pub fn get_total_unclaimed_meta(&self) -> U128 {
-        self.total_unclaimed_meta.into()
+        U128::from(self.total_unclaimed_near)
     }
+
     // query total_distributed meta for claims
     pub fn get_accumulated_distributed_for_claims(&self) -> U128 {
-        self.accumulated_distributed_for_claims.into()
+        // TODO!! <-----------------
+        U128::from(0)
+
+        // self..into()
     }
 }
 

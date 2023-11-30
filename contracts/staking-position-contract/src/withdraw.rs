@@ -9,7 +9,8 @@ impl StakingPositionContract {
         voter_id: VoterId,
         amount: Meta
     ) {
-        ext_ft::ext(self.meta_token_contract_address.clone())
+        // TODO: please check the address!!!!
+        ext_ft::ext(self.aaxxii_token_contract_address.clone())
             .with_static_gas(GAS_FOR_FT_TRANSFER)
             .with_attached_deposit(1)
             .ft_transfer(
@@ -48,14 +49,10 @@ impl StakingPositionContract {
         };
     }
 
-    fn restore_transfer_to_meta(
-        &mut self,
-        amount: Balance,
-        voter_id: VoterId
-    ) {
-        let mut voter = self.internal_get_voter(&voter_id);
-        voter.balance += amount;
-        self.voters.insert(&voter_id, &voter);
+    fn restore_transfer_to_meta(&mut self, amount: Balance, account_id: AccountId) {
+        let mut staker = self.internal_get_staker(account_id);
+        staker.balance += amount;
+        self.stakers.insert(&staker.id, &staker);
     }
 
     /// This transfer is only to claim available stNEAR
@@ -64,7 +61,8 @@ impl StakingPositionContract {
         voter_id: VoterId,
         amount: Balance
     ) {
-        ext_ft::ext(self.stnear_token_contract_address.clone())
+        /// TODO: Correct address??? change stnear
+        ext_ft::ext(self.aaxxii_token_contract_address.clone())
             .with_static_gas(GAS_FOR_FT_TRANSFER)
             .with_attached_deposit(1)
             .ft_transfer(

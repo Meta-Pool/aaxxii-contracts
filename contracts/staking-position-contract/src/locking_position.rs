@@ -75,29 +75,29 @@ impl StakingPositionContract {
 
     fn increase_locking_position(
         &mut self,
-        voter: &mut Voter,
+        staker: &mut Staker,
         index: u64,
         amount: Meta,
         locking_period: Days
     ) {
         let voting_power = self.calculate_voting_power(amount, locking_period);
-        let mut current_position = voter.get_position(index);
+        let mut current_position = staker.get_position(index);
         current_position.amount += amount;
         current_position.voting_power += voting_power;
 
-        voter.locking_positions.replace(index, &current_position);
-        voter.voting_power += voting_power;
+        staker.locking_positions.replace(index, &current_position);
+        staker.voting_power += voting_power;
         self.total_voting_power += voting_power;
     }
 
     fn create_locking_position(
         &mut self,
-        voter: &mut Voter,
+        staker: &mut Staker,
         amount: Meta,
         locking_period: Days
     ) {
         assert!(
-            (voter.locking_positions.len() as u8) < self.max_locking_positions,
+            (staker.locking_positions.len() as u8) < self.max_locking_positions,
             "The max number of locking positions is {}",
             self.max_locking_positions
         );
@@ -107,8 +107,8 @@ impl StakingPositionContract {
             locking_period,
             voting_power
         );
-        voter.locking_positions.push(&locking_position);
-        voter.voting_power += voting_power;
+        staker.locking_positions.push(&locking_position);
+        staker.voting_power += voting_power;
         self.total_voting_power += voting_power;
     }
 
@@ -116,8 +116,7 @@ impl StakingPositionContract {
         &mut self,
         amount: Meta,
         locking_period: Days,
-        voter_id: VoterId,
-        voter: &mut Voter
+        staker: &mut Staker
     ) {
         assert!(
             locking_period <= self.max_locking_period
@@ -126,21 +125,21 @@ impl StakingPositionContract {
             self.min_locking_period, self.max_locking_period 
         );
 
-        match voter.find_locked_position(locking_period) {
+        match staker.find_locked_position(locking_period) {
             Some(index) => {
                 // Deposit into existing locking position.
-                self.increase_locking_position(voter, index, amount, locking_period);
+                self.increase_locking_position(staker, index, amount, locking_period);
             },
             None => {
-                self.create_locking_position(voter, amount, locking_period);
+                self.create_locking_position(staker, amount, locking_period);
             }
         };
-        self.voters.insert(&voter_id, &voter);
+        self.stakers.insert(&staker.id, &staker);
     }
 
     pub(crate) fn create_unlocking_position(
         &mut self,
-        voter: &mut Voter,
+        staker: &mut Staker,
         amount: Meta,
         locking_period: Days,
         voting_power: VotingPower
@@ -149,7 +148,7 @@ impl StakingPositionContract {
         // to avoid multiple unlocking positions. Or not, be careful with the rounding
         // in the days.
         assert!(
-            (voter.locking_positions.len() as u8) < self.max_locking_positions,
+            (staker.locking_positions.len() as u8) < self.max_locking_positions,
             "The max number of locking positions is {}",
             self.max_locking_positions
         );
@@ -159,6 +158,6 @@ impl StakingPositionContract {
             voting_power
         );
         unlocking_position.unlocking_started_at = Some(get_current_epoch_millis());
-        voter.locking_positions.push(&unlocking_position);
+        staker.locking_positions.push(&unlocking_position);
     }
 }

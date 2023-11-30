@@ -17,14 +17,12 @@ impl StakingPositionContract {
     }
 
     /// Inner method to get or create a Voter.
-    pub(crate) fn internal_get_voter(&self, voter_id: &VoterId) -> Voter {
-        self.voters.get(voter_id).unwrap_or(Voter::new(voter_id))
+    pub(crate) fn internal_get_staker(&self, account_id: AccountId) -> Staker {
+        self.stakers.get(&account_id).unwrap_or(Staker::new(&account_id))
     }
-    pub(crate) fn internal_get_voter_or_panic(&self, voter_id: &VoterId) -> Voter {
-        match self.voters.get(voter_id) {
-            Some(a) => a,
-            _ => panic!("invalid voter_id {}", voter_id),
-        }
+
+    pub(crate) fn internal_get_staker_or_panic(&self) -> Staker {
+        self.stakers.get(&env::predecessor_account_id()).expect("Invalid staker_id.")
     }
 
     fn internal_get_total_votes_for_address(
@@ -118,21 +116,23 @@ impl StakingPositionContract {
         *total_unclaimed -= amount;
     }
 
+    // TODO: this is all wrong. please do it right!!!!
+
     pub(crate) fn add_claimable_meta(&mut self, account: &AccountId, amount: u128) {
         assert!(amount > 0);
-        Self::add_claimable(&mut self.claimable_meta, &mut self.total_unclaimed_meta, account, amount);
+        Self::add_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount);
     }
 
     pub(crate) fn add_claimable_stnear(&mut self, account: &AccountId, amount: u128) {
         assert!(amount > 0);
-        Self::add_claimable(&mut self.claimable_stnear, &mut self.total_unclaimed_stnear, account, amount);
+        Self::add_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount);
     }
 
     pub(crate) fn remove_claimable_meta(&mut self, account: &AccountId, amount: u128) {
-        Self::remove_claimable(&mut self.claimable_meta, &mut self.total_unclaimed_meta, account, amount, "META");
+        Self::remove_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount, "META");
     }
 
     pub(crate) fn remove_claimable_stnear(&mut self, account: &AccountId, amount: u128) {
-        Self::remove_claimable(&mut self.claimable_stnear, &mut self.total_unclaimed_stnear, account, amount, "stNEAR");
+        Self::remove_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount, "stNEAR");
     }
 }
