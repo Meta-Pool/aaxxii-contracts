@@ -10,7 +10,6 @@ overflow-checks = true
 [workspace]
 members = [
 	"katherine-sale-contract",
-	"staking-position-contract",
 	"test-p-token",
 	"test-utils"
 ]

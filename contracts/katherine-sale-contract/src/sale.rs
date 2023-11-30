@@ -132,20 +132,14 @@ impl Sale {
         &self,
         buyer_id: &AccountId
     ) -> Balance {
-        match self.claimable_sold_token_for_buyers.get(buyer_id) {
-            Some(amount) => amount,
-            None => 0,
-        }
+        self.claimable_sold_token_for_buyers.get(buyer_id).unwrap_or(0)
     }
 
     pub(crate) fn get_buyer_deposit(
         &self,
         buyer_id: &AccountId
     ) -> Balance {
-        match self.deposits.get(buyer_id) {
-            Some(amount) => amount,
-            None => 0,
-        }
+        self.deposits.get(buyer_id).unwrap_or(0)
     }
 
     pub(crate) fn from_payment_to_sold_token(&self, amount: u128) -> u128 {

@@ -310,6 +310,7 @@ impl KatherineSaleContract {
             sale.sold_tokens_for_buyers
         };
 
+        require!(excess > 0, "No excess amount of sold tokens.");
         self.seller_withdraw_excess_sold_tokens(excess, &mut sale)
     }
 

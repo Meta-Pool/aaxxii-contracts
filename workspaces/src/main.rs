@@ -199,6 +199,44 @@ async fn main() -> anyhow::Result<()> {
         sale["sold_tokens_for_buyers"].as_str().unwrap().parse::<u64>().unwrap()
     );
 
+    // ******************
+    // Checking bad math
+    // ******************
+
+    let outcome = owner
+        .call(katherine_contract.id(), "purchase_token_with_near")
+        .args_json(json!({
+            "sale_id": 0,
+        }))
+        .deposit(NearToken::from_near(5))
+        .gas(NearGas::from_tgas(300))
+        .transact()
+        .await?;
+    println!("purchase_token_with_near #0: {:#?}", outcome);
+    assert!(outcome.is_success());
+
+    let outcome: serde_json::Value = katherine_contract
+        .call("get_sale")
+        .args_json(serde_json::json!({
+            "sale_id": 0
+        }))
+        .view()
+        .await?
+        .json()?;
+    let sale = outcome.as_object().unwrap();
+    assert_eq!(
+        NearToken::from_near(10*2 + 5*2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        sale["required_sold_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        NearToken::from_near(15).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        sale["total_payment_token"].as_str().unwrap().parse::<u128>().unwrap()
+    );
+    assert_eq!(
+        0,
+        sale["sold_tokens_for_buyers"].as_str().unwrap().parse::<u64>().unwrap()
+    );
+
     // This first call must fail because it's pointing to the incorrect sale_id.
     // near call <ft-contract> ft_transfer_call '{"receiver_id": "<receiver-contract>", "amount": "<amount>", "msg": "<a-string-message>"}' --accountId <user_account_id> --depositYocto 1
     let outcome = buyer
@@ -279,11 +317,11 @@ async fn main() -> anyhow::Result<()> {
         .json()?;
     let sale = outcome.as_object().unwrap();
     assert_eq!(
-        NearToken::from_near(10 * 2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        NearToken::from_near(10*2 + 5*2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
         sale["required_sold_token"].as_str().unwrap().parse::<u128>().unwrap()
     );
     assert_eq!(
-        NearToken::from_near(10).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        NearToken::from_near(15).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
         sale["total_payment_token"].as_str().unwrap().parse::<u128>().unwrap()
     );
     assert_eq!(
@@ -348,7 +386,7 @@ async fn main() -> anyhow::Result<()> {
     assert_eq!(
         treasury_new_balance.as_yoctonear(),
         treasury_original_balance.as_yoctonear()
-        + NearToken::from_millinear(9750).as_yoctonear()
+        + NearToken::from_millinear(14625).as_yoctonear() // Manually calculating the fee.
     );
 
     println!("old: {} \nnew: {}", treasury_original_balance, treasury_new_balance);
@@ -363,7 +401,7 @@ async fn main() -> anyhow::Result<()> {
         .json()?;
     let sale = outcome.as_object().unwrap();
     assert_eq!(
-        NearToken::from_near(10 * 2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        NearToken::from_near(10*2 + 5*2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
         sale["required_sold_token"].as_str().unwrap().parse::<u128>().unwrap()
     );
     assert_eq!(
@@ -371,7 +409,7 @@ async fn main() -> anyhow::Result<()> {
         sale["total_payment_token"].as_str().unwrap().parse::<u128>().unwrap()
     );
     assert_eq!(
-        NearToken::from_millinear(250).as_yoctonear(),
+        NearToken::from_millinear(375).as_yoctonear(), // Manually calculating the fee.
         sale["total_fees"].as_str().unwrap().parse::<u128>().unwrap()
     );
     assert_eq!(
@@ -393,7 +431,7 @@ async fn main() -> anyhow::Result<()> {
     assert_eq!(
         treasury_new_balance.as_yoctonear(),
         treasury_original_balance.as_yoctonear()
-        + NearToken::from_near(10).as_yoctonear()
+        + NearToken::from_near(15).as_yoctonear()
     );
 
     let outcome: serde_json::Value = katherine_contract
@@ -406,7 +444,7 @@ async fn main() -> anyhow::Result<()> {
         .json()?;
     let sale = outcome.as_object().unwrap();
     assert_eq!(
-        NearToken::from_near(10 * 2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
+        NearToken::from_near(10*2 + 5*2).as_yoctonear(), // every 1 deposit gives 2 sold_tokens
         sale["required_sold_token"].as_str().unwrap().parse::<u128>().unwrap()
     );
     assert_eq!(
