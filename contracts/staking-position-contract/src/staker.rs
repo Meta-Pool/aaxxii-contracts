@@ -52,7 +52,7 @@ impl Staker {
     }
 
     /// Returns the total amount of AAXXII tokens that are under the unlocking process.
-    pub(crate) fn sum_unlocking(&self) -> Meta {
+    pub(crate) fn sum_unlocking(&self) -> Balance {
         let mut result = 0_u128;
         for locking_position in self.locking_positions.iter() {
             if locking_position.is_unlocking() {
@@ -63,7 +63,7 @@ impl Staker {
     }
 
     /// Returns the total amount of AAXXII tokens that are already unlocked.
-    pub(crate) fn sum_unlocked(&self) -> Meta {
+    pub(crate) fn sum_unlocked(&self) -> Balance {
         let mut result = 0_u128;
         for locking_position in self.locking_positions.iter() {
             if locking_position.is_unlocked() {
@@ -82,8 +82,8 @@ impl Staker {
     }
 
     /// Returns the index of a locked position with a locking_period.
-    pub(crate) fn find_locked_position(&self, locking_period: Days) -> Option<u64> {
-        let mut index = 0_u64;
+    pub(crate) fn find_locked_position(&self, locking_period: Days) -> Option<PositionIndex> {
+        let mut index = 0_u16;
         for locking_position in self.locking_positions.iter() {
             if locking_position.locking_period == locking_period && locking_position.is_locked() {
                 return Some(index);
@@ -95,12 +95,12 @@ impl Staker {
 
     pub(crate) fn get_position(&self, index: PositionIndex) -> LockingPosition {
         self.locking_positions
-            .get(index)
+            .get(index as u64)
             .expect("Index out of range!")
     }
 
     pub(crate) fn remove_position(&mut self, index: PositionIndex) {
-        self.locking_positions.swap_remove(index);
+        self.locking_positions.swap_remove(index as u64);
     }
 
     pub(crate) fn get_votes_for_address(
@@ -124,7 +124,7 @@ impl Staker {
                 .get(index)
                 .expect("Locking position not found!");
             if locking_position.is_unlocked() {
-                result.push(index);
+                result.push(index.try_into().unwrap());
             }
         }
         result
@@ -134,7 +134,7 @@ impl Staker {
         let mut locking_positions = Vec::<LockingPositionJSON>::new();
         for index in 0..self.locking_positions.len() {
             let pos = self.locking_positions.get(index).unwrap();
-            locking_positions.push(pos.to_json(Some(index)));
+            locking_positions.push(pos.to_json(Some(index.try_into().unwrap())));
         }
 
         let mut vote_positions = Vec::<VotePositionJSON>::new();

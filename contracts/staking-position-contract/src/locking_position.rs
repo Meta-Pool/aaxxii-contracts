@@ -5,18 +5,22 @@ use near_sdk::json_types::U128;
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, Debug)]
 pub struct LockingPosition {
-    pub amount: Meta,
+    pub amount: Balance,
     pub locking_period: Days,
     pub voting_power: VotingPower,
     pub unlocking_started_at: Option<EpochMillis>,
 }
 
 impl LockingPosition {
-    pub(crate) fn locking_period_millis(&self) -> u64 {
+    pub(crate) fn locking_period_millis(&self) -> EpochMillis {
         days_to_millis(self.locking_period)
     }
 
-    pub(crate) fn new(amount: Meta, locking_period: Days, voting_power: VotingPower) -> Self {
+    pub(crate) fn new(
+        amount: Balance,
+        locking_period: Days,
+        voting_power: VotingPower
+    ) -> Self {
         LockingPosition {
             amount,
             locking_period,
@@ -63,8 +67,13 @@ impl LockingPosition {
 
 #[near_bindgen]
 impl StakingPositionContract {
-    /// Voting power is given by f(x) = A + Bx. Where A=1, B=4 and x is the locking period proportion.
-    pub(crate) fn calculate_voting_power(&self, amount: Meta, locking_period: Days) -> VotingPower {
+    /// Voting power is given by f(x) = A + Bx.
+    /// Where A=1, B=4 and x is the locking period proportion.
+    pub(crate) fn calculate_voting_power(
+        &self,
+        amount: Balance,
+        locking_period: Days
+    ) -> VotingPower {
         let multiplier = YOCTO_UNITS + proportional(
             4 * YOCTO_UNITS,
             (locking_period - self.min_locking_period) as u128,
@@ -76,8 +85,8 @@ impl StakingPositionContract {
     fn increase_locking_position(
         &mut self,
         staker: &mut Staker,
-        index: u64,
-        amount: Meta,
+        index: PositionIndex,
+        amount: Balance,
         locking_period: Days
     ) {
         let voting_power = self.calculate_voting_power(amount, locking_period);
@@ -85,7 +94,7 @@ impl StakingPositionContract {
         current_position.amount += amount;
         current_position.voting_power += voting_power;
 
-        staker.locking_positions.replace(index, &current_position);
+        staker.locking_positions.replace(index as u64, &current_position);
         staker.voting_power += voting_power;
         self.total_voting_power += voting_power;
     }
@@ -93,7 +102,7 @@ impl StakingPositionContract {
     fn create_locking_position(
         &mut self,
         staker: &mut Staker,
-        amount: Meta,
+        amount: Balance,
         locking_period: Days
     ) {
         assert!(
@@ -114,7 +123,7 @@ impl StakingPositionContract {
 
     pub(crate) fn deposit_locking_position(
         &mut self,
-        amount: Meta,
+        amount: Balance,
         locking_period: Days,
         staker: &mut Staker
     ) {
@@ -140,7 +149,7 @@ impl StakingPositionContract {
     pub(crate) fn create_unlocking_position(
         &mut self,
         staker: &mut Staker,
-        amount: Meta,
+        amount: Balance,
         locking_period: Days,
         voting_power: VotingPower
     ) {

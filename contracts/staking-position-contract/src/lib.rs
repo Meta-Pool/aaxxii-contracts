@@ -19,6 +19,8 @@ mod utils;
 mod staker;
 mod withdraw;
 
+
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct StakingPositionContract {
@@ -31,22 +33,18 @@ pub struct StakingPositionContract {
     pub min_locking_period: Days,
     pub max_locking_period: Days,
 
-    /// Denominated in AAXXII tokens.
     pub min_deposit_amount: Balance,
     pub max_locking_positions: u8,
     pub max_voting_positions: u8,
-    pub aaxxii_token_contract_address: AccountId,
+    pub underlying_token_contract_address: AccountId,
 
     /// Stakers can claim NEAR.
     pub claimable_near: UnorderedMap<VoterId, u128>,
     pub accum_near_distributed_for_claims: u128, // accumulated total NEAR distributed
-    pub total_unclaimed_near: u128,              // currently unclaimed META
+    pub total_unclaimed_near: u128,              // currently unclaimed NEAR
 
-    /// Stakers can claim any FT token.
-    pub available_claimable_ft_addresses: UnorderedSet<AccountId>,
-    pub claimable_ft: UnorderedMap<AccountId, UnorderedMap<VoterId, u128>>,
-    pub accum_ft_distributed_for_claims: UnorderedMap<AccountId, u128>,
-    pub total_unclaimed_ft: UnorderedMap<AccountId, u128>,
+    /// Stakers can claim any FT token. Key is the ft address.
+    pub claimable_ft: UnorderedMap<AccountId, FtDetails>,
 }
 
 #[near_bindgen]
@@ -59,9 +57,7 @@ impl StakingPositionContract {
         min_deposit_amount: U128,
         max_locking_positions: u8,
         max_voting_positions: u8,
-        meta_token_contract_address: AccountId,
-        aaxxii_token_contract_address: AccountId,
-        registration_cost: U128,
+        underlying_token_contract_address: AccountId,
         available_claimable_ft_addresses: Vec<AccountId>,
     ) -> Self {
         // require!(!env::state_exists(), "The contract is already initialized");
@@ -79,18 +75,14 @@ impl StakingPositionContract {
             min_deposit_amount: min_deposit_amount.0,
             max_locking_positions,
             max_voting_positions,
-            aaxxii_token_contract_address,
+            underlying_token_contract_address,
             claimable_near: UnorderedMap::new(StorageKey::ClaimableNear),
             accum_near_distributed_for_claims: 0,
             total_unclaimed_near: 0,
-            available_claimable_ft_addresses: UnorderedSet::new(StorageKey::AvailableFt),
             claimable_ft: UnorderedMap::new(StorageKey::ClaimableFt),
-            accum_ft_distributed_for_claims: UnorderedMap::new(StorageKey::AccumFt),
-            total_unclaimed_ft: UnorderedMap::new(StorageKey::UnclaimedFt),
         };
-
-        for address in available_claimable_ft_addresses.iter() {
-            contract.available_claimable_ft_addresses.insert(address);
+        for token_address in available_claimable_ft_addresses.iter() {
+            contract.insert_new_ft(token_address);
         }
 
         contract
@@ -100,11 +92,12 @@ impl StakingPositionContract {
     // * Update contract settings *
     // ****************************
 
+    /// The available ft addresses will never decrease in length.
     #[payable]
-    pub fn set_aaxxii_contract(&mut self, new_value: AccountId) {
+    pub fn insert_claimable_ft_addresses(&mut self, new_value: AccountId) {
         assert_one_yocto();
         self.assert_only_owner();
-        self.aaxxii_token_contract_address = new_value;
+        self.insert_new_ft(&new_value);
     }
 
     // ****************
@@ -153,12 +146,13 @@ impl StakingPositionContract {
 
         log!("UNLOCK: {} unlocked position {}.", &staker.id, index);
         locking_position.unlocking_started_at = Some(get_current_epoch_millis());
-        staker.locking_positions.replace(index, &locking_position);
+        staker.locking_positions.replace(index as u64, &locking_position);
         staker.voting_power -= voting_power;
         self.total_voting_power = self.total_voting_power.saturating_sub(voting_power);
         self.stakers.insert(&staker.id, &staker);
     }
 
+    /// @param amount - The amount to unlock.
     pub fn unlock_partial_position(&mut self, index: PositionIndex, amount: U128) {
         let mut staker = self.internal_get_staker_or_panic();
         let mut locking_position = staker.get_position(index);
@@ -173,7 +167,7 @@ impl StakingPositionContract {
         require!(locking_position.amount > amount, "Amount too large!");
         assert!(
             (locking_position.amount - amount) >= self.min_deposit_amount,
-            "A locking position cannot have less than {} META",
+            "A locking position cannot have less than {}",
             self.min_deposit_amount
         );
         let remove_voting_power = self.calculate_voting_power(amount, locking_period);
@@ -197,7 +191,7 @@ impl StakingPositionContract {
         // Decrease current locking position
         locking_position.voting_power -= remove_voting_power;
         locking_position.amount -= amount;
-        staker.locking_positions.replace(index, &locking_position);
+        staker.locking_positions.replace(index as u64, &locking_position);
 
         staker.voting_power -= remove_voting_power;
         self.total_voting_power = self.total_voting_power.saturating_sub(remove_voting_power);
@@ -248,7 +242,7 @@ impl StakingPositionContract {
         locking_position.voting_power = new_voting_power;
 
         // save
-        staker.locking_positions.replace(index, &locking_position);
+        staker.locking_positions.replace(index as u64, &locking_position);
         self.stakers.insert(&staker.id, &staker);
     }
 
@@ -269,7 +263,7 @@ impl StakingPositionContract {
         let amount_from_balance = amount_from_balance.0;
         assert!(
             staker.balance >= amount_from_balance,
-            "Not enough balance. You have {} META in balance, required {}.",
+            "Not enough balance. You have {} in balance, required {}.",
             staker.balance,
             amount_from_balance
         );
@@ -317,20 +311,20 @@ impl StakingPositionContract {
         let amount_from_position = amount_from_position.0;
         assert!(
             staker.balance >= amount_from_balance,
-            "Not enough balance. You have {} META in balance, required {}.",
+            "Not enough balance. You have {} in balance, required {}.",
             staker.balance,
             amount_from_balance
         );
         assert!(
             locking_position.amount >= amount_from_position,
-            "Locking position amount is not enough. Locking position has {} META, required {}.",
+            "Locking position amount is not enough. Locking position has {}, required {}.",
             locking_position.amount,
             amount_from_position
         );
         let amount = amount_from_balance + amount_from_position;
         assert!(
             amount >= self.min_deposit_amount,
-            "A locking position cannot have less than {} META.",
+            "A locking position cannot have less than {}.",
             self.min_deposit_amount
         );
         // Check if position is unlocking.
@@ -355,13 +349,13 @@ impl StakingPositionContract {
             let new_amount = locking_position.amount - amount_from_position;
             assert!(
                 amount >= self.min_deposit_amount,
-                "A locking position cannot have less than {} META.",
+                "A locking position cannot have less than {}.",
                 self.min_deposit_amount
             );
             assert!(new_amount > 0, "Use relock_position() function instead.");
 
             locking_position.amount = new_amount;
-            staker.locking_positions.replace(index, &locking_position);
+            staker.locking_positions.replace(index as u64, &locking_position);
         } else {
             staker.balance += locking_position.amount - amount_from_position;
             staker.remove_position(index);
@@ -378,13 +372,13 @@ impl StakingPositionContract {
         let amount = amount_from_balance.0;
         assert!(
             staker.balance >= amount,
-            "Not enough balance. You have {} META in balance, required {}.",
+            "Not enough balance. You have {} in balance, required {}.",
             staker.balance,
             amount
         );
         assert!(
             amount >= self.min_deposit_amount,
-            "A locking position cannot have less than {} META.",
+            "A locking position cannot have less than {}.",
             self.min_deposit_amount
         );
 
@@ -428,7 +422,7 @@ impl StakingPositionContract {
         let amount_from_balance = amount_from_balance.0;
         assert!(
             staker.balance >= amount_from_balance,
-            "Not enough balance. You have {} META in balance, required {}.",
+            "Not enough balance. You have {} in balance, required {}.",
             staker.balance,
             amount_from_balance
         );
@@ -445,11 +439,11 @@ impl StakingPositionContract {
 
         if staker.is_empty() {
             self.stakers.remove(&staker.id);
-            log!("GODSPEED: {} is no longer part of Meta Vote!", &staker.id);
+            log!("GODSPEED: {} is no longer part of Staking-contract!", &staker.id);
         } else {
             self.stakers.insert(&staker.id, &staker);
         }
-        self.transfer_meta_to_voter(staker.id, total_to_withdraw);
+        self.transfer_balance_to_voter(staker.id, total_to_withdraw);
     }
 
     pub fn withdraw_all(&mut self) {
@@ -468,11 +462,11 @@ impl StakingPositionContract {
 
         if staker.is_empty() {
             self.stakers.remove(&staker.id);
-            log!("GODSPEED: {} is no longer part of Meta Vote!", &staker.id);
+            log!("GODSPEED: {} is no longer part of Staking-contract!", &staker.id);
         } else {
             self.stakers.insert(&staker.id, &staker);
         }
-        self.transfer_meta_to_voter(staker.id, total_to_withdraw);
+        self.transfer_balance_to_voter(staker.id, total_to_withdraw);
     }
 
     // **********
@@ -519,7 +513,7 @@ impl StakingPositionContract {
             contract_address.as_str()
         );
 
-        // Update Meta Vote state.
+        // Update contract state.
         self.internal_increase_total_votes(voting_power, &contract_address, &votable_object_id);
     }
 
@@ -619,7 +613,7 @@ impl StakingPositionContract {
             contract_address.as_str()
         );
 
-        // Update Meta Vote state.
+        // Update contract state.
         self.internal_decrease_total_votes(votes, &contract_address, &votable_object_id);
     }
 
@@ -679,11 +673,16 @@ impl StakingPositionContract {
         U128::from(self.claimable_near.get(&account_id).unwrap_or(0))
     }
 
-    pub fn get_claimable_ft(&self, voter_id: AccountId, ft_id: AccountId) -> U128 {
+    pub fn get_claimable_ft(
+        &self,
+        staker_id: AccountId,
+        token_address: AccountId
+    ) -> U128 {
         U128::from(
-            self.claimable_ft.get(&ft_id)
+            self.claimable_ft.get(&token_address)
                 .expect("Invalid ft token")
-                .get(&voter_id)
+                .owners
+                .get(&staker_id)
                 .unwrap_or(0)
         )
     }
@@ -738,7 +737,7 @@ impl StakingPositionContract {
             let locking_position = staker.locking_positions
                 .get(index)
                 .expect("Locking position not found!");
-            result.push(locking_position.to_json(Some(index)));
+            result.push(locking_position.to_json(Some(index.try_into().unwrap())));
         }
         result
     }
@@ -749,7 +748,7 @@ impl StakingPositionContract {
         account_id: AccountId,
     ) -> Option<LockingPositionJSON> {
         let staker = self.internal_get_staker(account_id);
-        match staker.locking_positions.get(index) {
+        match staker.locking_positions.get(index as u64) {
             Some(locking_position) => Some(locking_position.to_json(Some(index))),
             None => None,
         }
@@ -822,18 +821,17 @@ impl StakingPositionContract {
         U128::from(votes)
     }
 
-    // query current meta ready for distribution
+    // Get current NEAR ready for distribution.
     pub fn get_total_unclaimed_meta(&self) -> U128 {
         U128::from(self.total_unclaimed_near)
     }
 
-    // query total_distributed meta for claims
-    pub fn get_accumulated_distributed_for_claims(&self) -> U128 {
-        // TODO!! <-----------------
-        U128::from(0)
+    // pub fn get_accumulated_distributed_for_claims(&self) -> U128 {
+    //     // TODO!! <-----------------
+    //     U128::from(0)
 
-        // self..into()
-    }
+    //     // self..into()
+    // }
 }
 
 #[cfg(not(target_arch = "wasm32"))]

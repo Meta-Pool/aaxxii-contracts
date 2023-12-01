@@ -76,6 +76,23 @@ impl StakingPositionContract {
         }
     }
 
+    pub(crate) fn insert_new_ft(&mut self, token_address: &AccountId) {
+        match self.claimable_ft.get(token_address) {
+            None => self.claimable_ft.insert(
+                token_address,
+                &FtDetails::new(token_address)
+            ),
+            Some(_) => panic!("FT address already exists."),
+        };
+    }
+
+    pub(crate) fn is_ft_available(&self, token_address: &AccountId) -> bool {
+        match self.claimable_ft.get(token_address) {
+            None => false,
+            Some(_) => true,
+        }
+    }
+
     // ***************************
     // * Claimable Meta & stNear *
     // ***************************
@@ -118,21 +135,37 @@ impl StakingPositionContract {
 
     // TODO: this is all wrong. please do it right!!!!
 
-    pub(crate) fn add_claimable_meta(&mut self, account: &AccountId, amount: u128) {
+    pub(crate) fn add_claimable_ft(
+        &mut self,
+        account: &AccountId,
+        token_address: &AccountId,
+        amount: u128
+    ) {
         assert!(amount > 0);
-        Self::add_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount);
+
+        let mut details = self.claimable_ft.get(token_address)
+            .expect("Invalid token address.");
+
+        let existing_claimable_amount = details.owners.get(account).unwrap_or_default();
+        details.owners.insert(account, &(existing_claimable_amount + amount));
+
+        // keep contract total
+        details.total_unclaimed_ft += amount;
+        details.accum_ft_distributed_for_claims += amount;
+
+        self.claimable_ft.insert(token_address, &details);
     }
 
-    pub(crate) fn add_claimable_stnear(&mut self, account: &AccountId, amount: u128) {
-        assert!(amount > 0);
-        Self::add_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount);
-    }
+    // pub(crate) fn add_claimable_stnear(&mut self, account: &AccountId, amount: u128) {
+    //     assert!(amount > 0);
+    //     Self::add_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount);
+    // }
 
     pub(crate) fn remove_claimable_meta(&mut self, account: &AccountId, amount: u128) {
         Self::remove_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount, "META");
     }
 
-    pub(crate) fn remove_claimable_stnear(&mut self, account: &AccountId, amount: u128) {
-        Self::remove_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount, "stNEAR");
-    }
+    // pub(crate) fn remove_claimable_stnear(&mut self, account: &AccountId, amount: u128) {
+    //     Self::remove_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount, "stNEAR");
+    // }
 }
