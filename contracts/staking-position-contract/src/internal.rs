@@ -11,7 +11,7 @@ impl StakingPositionContract {
     pub(crate) fn assert_min_deposit_amount(&self, amount: Balance) {
         assert!(
             amount >= self.min_deposit_amount,
-            "Minimum deposit amount is {} META.",
+            "Minimum deposit amount is {}.",
             self.min_deposit_amount
         );
     }
@@ -93,60 +93,9 @@ impl StakingPositionContract {
         }
     }
 
-    // ***************************
-    // * Claimable Meta & stNear *
-    // ***************************
-
-    fn add_claimable(
-        claimable_map: &mut UnorderedMap<VoterId, u128>,
-        total_unclaimed: &mut u128,
-        account: &AccountId,
-        amount: u128
-    ) {
-        let existing_claimable_amount = claimable_map.get(account).unwrap_or_default();
-        claimable_map.insert(account, &(existing_claimable_amount + amount));
-        // keep contract total
-        *total_unclaimed += amount;
-    }
-
-    fn remove_claimable(
-        claimable_map: &mut UnorderedMap<VoterId, u128>,
-        total_unclaimed: &mut u128,
-        account: &AccountId,
-        amount: u128,
-        token: &str
-    ) {
-        let existing_claimable_amount = claimable_map.get(account).unwrap_or_default();
-        assert!(
-            existing_claimable_amount >= amount,
-            "you don't have enough claimable {}",
-            token
-        );
-        let after_remove = existing_claimable_amount - amount;
-        if after_remove == 0 {
-            // 0 means remove
-            claimable_map.remove(account)
-        } else {
-            claimable_map.insert(account, &after_remove)
-        };
-        // keep contract total
-        *total_unclaimed -= amount;
-    }
-
-    // pub(crate) fn add_claimable_stnear(&mut self, account: &AccountId, amount: u128) {
-    //     assert!(amount > 0);
-    //     Self::add_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount);
-    // }
-
-    pub(crate) fn remove_claimable_meta(&mut self, account: &AccountId, amount: u128) {
-        Self::remove_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount, "META");
-    }
-
-    // pub(crate) fn remove_claimable_stnear(&mut self, account: &AccountId, amount: u128) {
-    //     Self::remove_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount, "stNEAR");
-    // }
-
-    // TODO: this is all wrong. please do it right!!!!
+    // *******************
+    // * add & remove ft *
+    // *******************
 
     pub(crate) fn add_claimable_ft(
         &mut self,
@@ -169,6 +118,38 @@ impl StakingPositionContract {
         self.claimable_ft.insert(token_address, &details);
     }
 
+    pub(crate) fn remove_claimable_ft(
+        &mut self,
+        account: &AccountId,
+        amount: u128,
+        token_address: &AccountId
+    ) {
+        assert!(amount > 0);
+
+        let mut details = self.claimable_ft.get(token_address)
+            .expect("Invalid token address.");
+
+        let existing_claimable_amount = details.owners.get(account).unwrap_or_default();
+        assert!(existing_claimable_amount >= amount, "You do not have enough claimable FT.");
+
+        let after_remove = existing_claimable_amount - amount;
+        if after_remove == 0 {
+            // 0 means remove
+            details.owners.remove(account)
+        } else {
+            details.owners.insert(account, &after_remove)
+        };
+
+        // keep contract total
+        self.total_unclaimed_near -= amount;
+
+        self.claimable_ft.insert(token_address, &details);
+    }
+
+    // *********************
+    // * add & remove near *
+    // *********************
+
     pub(crate) fn add_claimable_near(
         &mut self,
         account: &AccountId,
@@ -184,4 +165,25 @@ impl StakingPositionContract {
         self.accum_near_distributed_for_claims += amount;
     }
 
+    pub(crate) fn remove_claimable_near(
+        &mut self,
+        account: &AccountId,
+        amount: u128
+    ) {
+        assert!(amount > 0);
+
+        let existing_claimable_amount = self.claimable_near.get(account).unwrap_or_default();
+        assert!(existing_claimable_amount >= amount, "You do not have enough claimable NEAR.");
+
+        let after_remove = existing_claimable_amount - amount;
+        if after_remove == 0 {
+            // 0 means remove
+            self.claimable_near.remove(account)
+        } else {
+            self.claimable_near.insert(account, &after_remove)
+        };
+
+        // keep contract total
+        self.total_unclaimed_near -= amount;
+    }
 }

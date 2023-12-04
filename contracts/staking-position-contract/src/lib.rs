@@ -2,9 +2,9 @@ use crate::utils::{days_to_millis, millis_to_days};
 use crate::{constants::*, locking_position::*};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::unordered_map::UnorderedMap;
-use near_sdk::collections::{Vector, UnorderedSet};
-use near_sdk::json_types::{U128, U64};
-use near_sdk::{assert_one_yocto, env, log, near_bindgen, require, AccountId, Balance, PanicOnDefault};
+use near_sdk::collections::Vector;
+use near_sdk::json_types::U128;
+use near_sdk::{assert_one_yocto, env, log, near_bindgen, require, AccountId, Balance, PanicOnDefault, Promise};
 use types::*;
 use utils::{generate_hash_id, get_current_epoch_millis};
 use staker::{Staker, StakerJSON};
@@ -102,33 +102,33 @@ impl StakingPositionContract {
     // * claim *
     // *********
 
-    // pub fn claim_near(&mut self, amount: U128) {
-    //     let amount = amount.0;
-    //     self.assert_min_deposit_amount(amount);
-    //     let voter_id = VoterId::from(env::predecessor_account_id());
-    //     self.remove_claimable_meta(&voter_id, amount);
-    //     let mut voter = self.internal_get_voter_or_panic(&voter_id);
-    //     // create/update locking position
-    //     self.deposit_locking_position(amount, locking_period, voter_id, &mut voter);
-    // }
+    pub fn claim_near(&mut self, amount: U128) -> Promise {
+        let amount = amount.0;
+        let staker_id = env::predecessor_account_id();
+        self.remove_claimable_near(&staker_id, amount);
 
-    // // claim stNear
-    // pub fn claim_stnear(&mut self, amount: U128) {
-    //     let amount = amount.0;
-    //     let voter_id = VoterId::from(env::predecessor_account_id());
-    //     self.remove_claimable_stnear(&voter_id, amount);
+        // IMPORTANT: if account is not a staker, then the claim is not available.
+        let _ = self.internal_get_staker_or_panic();
+        Promise::new(staker_id).transfer(amount)
+    }
 
-    //     // IMPORTANT: if user is not a voter, then the claim is not available.
-    //     let _voter = self.internal_get_voter_or_panic(&voter_id);
-    //     self.transfer_stnear_to_voter(voter_id, amount);
-    // }
+    pub fn claim_ft(&mut self, amount: U128, token_address: AccountId) -> Promise {
+        let amount = amount.0;
+        let staker_id = env::predecessor_account_id();
+
+        self.remove_claimable_ft(&staker_id, amount, &token_address);
+
+        // IMPORTANT: if account is not a staker, then the claim is not available.
+        let _ = self.internal_get_staker_or_panic();
+        self.transfer_claimable_ft(staker_id, amount, token_address)
+    }
 
     // ****************
     // * NEAR deposit *
     // ****************
 
     #[payable]
-    pub fn deposit_near(
+    pub fn deposit_claimable_near(
         &mut self,
         distribute_info: Vec<(AccountId, U128)>
     ) {

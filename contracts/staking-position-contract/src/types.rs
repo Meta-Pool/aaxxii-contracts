@@ -1,9 +1,9 @@
 use near_sdk::collections::UnorderedMap;
 use uint::construct_uint;
-use near_sdk::{AccountId, Balance};
+use near_sdk::AccountId;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::json_types::U128;
-use near_sdk::{BorshStorageKey, Gas, CryptoHash};
+use near_sdk::{BorshStorageKey, CryptoHash};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 
 use crate::utils::generate_hash_id;

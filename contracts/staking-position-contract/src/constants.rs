@@ -1,5 +1,4 @@
-use near_sdk::{BorshStorageKey, Gas, CryptoHash};
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::Gas;
 
 pub const E24: u128 = 1_000_000_000_000_000_000_000_000;
 pub const YOCTO_UNITS: u128 = E24;

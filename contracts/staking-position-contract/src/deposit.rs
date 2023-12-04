@@ -53,6 +53,12 @@ impl FungibleTokenReceiver for StakingPositionContract {
 }
 
 impl StakingPositionContract {
+    fn assert_total_distributed(amount: u128, target: u128) {
+        assert_eq!(target, amount, "total to distribute {} != total_amount sent {}",
+            target, amount
+        );
+    }
+
     // called from ft_on_transfer
     fn distribute_ft_claims(
         &mut self,
@@ -74,12 +80,7 @@ impl StakingPositionContract {
             total_distributed += amount;
         }
 
-        assert!(
-            total_distributed == total_amount,
-            "total to distribute {} != total_amount sent {}",
-            total_distributed,
-            total_amount
-        );
+        Self::assert_total_distributed(total_distributed, total_amount);
     }
 
     pub(crate) fn distribute_near_claims(
@@ -95,11 +96,6 @@ impl StakingPositionContract {
             total_distributed += amount;
         }
 
-        assert!(
-            total_distributed == total_amount,
-            "total to distribute {} != total_amount sent {}",
-            total_distributed,
-            total_amount
-        );
+        Self::assert_total_distributed(total_distributed, total_amount);
     }
 }
