@@ -133,6 +133,19 @@ impl StakingPositionContract {
         *total_unclaimed -= amount;
     }
 
+    // pub(crate) fn add_claimable_stnear(&mut self, account: &AccountId, amount: u128) {
+    //     assert!(amount > 0);
+    //     Self::add_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount);
+    // }
+
+    pub(crate) fn remove_claimable_meta(&mut self, account: &AccountId, amount: u128) {
+        Self::remove_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount, "META");
+    }
+
+    // pub(crate) fn remove_claimable_stnear(&mut self, account: &AccountId, amount: u128) {
+    //     Self::remove_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount, "stNEAR");
+    // }
+
     // TODO: this is all wrong. please do it right!!!!
 
     pub(crate) fn add_claimable_ft(
@@ -156,16 +169,19 @@ impl StakingPositionContract {
         self.claimable_ft.insert(token_address, &details);
     }
 
-    // pub(crate) fn add_claimable_stnear(&mut self, account: &AccountId, amount: u128) {
-    //     assert!(amount > 0);
-    //     Self::add_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount);
-    // }
+    pub(crate) fn add_claimable_near(
+        &mut self,
+        account: &AccountId,
+        amount: u128
+    ) {
+        assert!(amount > 0);
 
-    pub(crate) fn remove_claimable_meta(&mut self, account: &AccountId, amount: u128) {
-        Self::remove_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount, "META");
+        let existing_claimable_amount = self.claimable_near.get(account).unwrap_or_default();
+        self.claimable_near.insert(account, &(existing_claimable_amount + amount));
+
+        // keep contract total
+        self.total_unclaimed_near += amount;
+        self.accum_near_distributed_for_claims += amount;
     }
 
-    // pub(crate) fn remove_claimable_stnear(&mut self, account: &AccountId, amount: u128) {
-    //     Self::remove_claimable(&mut self.claimable_near, &mut self.total_unclaimed_near, account, amount, "stNEAR");
-    // }
 }

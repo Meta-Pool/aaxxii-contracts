@@ -19,8 +19,6 @@ mod utils;
 mod staker;
 mod withdraw;
 
-
-
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct StakingPositionContract {
@@ -100,14 +98,11 @@ impl StakingPositionContract {
         self.insert_new_ft(&new_value);
     }
 
-    // ****************
-    // * claim & Lock *
-    // ****************
+    // *********
+    // * claim *
+    // *********
 
-    /// users will only claim?
-
-    // // claim META and create/update a locking position
-    // pub fn claim_and_lock(&mut self, amount: U128, locking_period: u16) {
+    // pub fn claim_near(&mut self, amount: U128) {
     //     let amount = amount.0;
     //     self.assert_min_deposit_amount(amount);
     //     let voter_id = VoterId::from(env::predecessor_account_id());
@@ -127,6 +122,20 @@ impl StakingPositionContract {
     //     let _voter = self.internal_get_voter_or_panic(&voter_id);
     //     self.transfer_stnear_to_voter(voter_id, amount);
     // }
+
+    // ****************
+    // * NEAR deposit *
+    // ****************
+
+    #[payable]
+    pub fn deposit_near(
+        &mut self,
+        distribute_info: Vec<(AccountId, U128)>
+    ) {
+        let total_amount = env::attached_deposit();
+        require!(total_amount > 0, "Zero NEAR deposit.");
+        self.distribute_near_claims(total_amount, distribute_info);
+    }
 
     // *************
     // * Unlocking *
@@ -299,7 +308,7 @@ impl StakingPositionContract {
         &mut self,
         index: PositionIndex,
         amount_from_position: U128,
-        amount: U128,
+        // amount: U128,
         locking_period: Days,
         amount_from_balance: U128,
     ) {
