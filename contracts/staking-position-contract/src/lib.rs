@@ -27,7 +27,7 @@ pub struct StakingPositionContract {
     
     /// Total amount of voting power for an address - votable id.
     pub total_voting_power: VotingPower,
-    pub votes: UnorderedMap<ContractAddress, UnorderedMap<VotableObjId, VotingPower>>,
+    pub votes: UnorderedMap<AccountId, UnorderedMap<VotableObjId, VotingPower>>,
     pub min_locking_period: Days,
     pub max_locking_period: Days,
 
@@ -37,7 +37,7 @@ pub struct StakingPositionContract {
     pub underlying_token_contract_address: AccountId,
 
     /// Stakers can claim NEAR.
-    pub claimable_near: UnorderedMap<VoterId, u128>,
+    pub claimable_near: UnorderedMap<AccountId, u128>,
     pub accum_near_distributed_for_claims: u128, // accumulated total NEAR distributed
     pub total_unclaimed_near: u128,              // currently unclaimed NEAR
 
@@ -485,7 +485,7 @@ impl StakingPositionContract {
     pub fn vote(
         &mut self,
         voting_power: U128,
-        contract_address: ContractAddress,
+        contract_address: AccountId,
         votable_object_id: VotableObjId,
     ) {
         let mut staker = self.internal_get_staker_or_panic();
@@ -529,7 +529,7 @@ impl StakingPositionContract {
     pub fn rebalance(
         &mut self,
         voting_power: U128,
-        contract_address: ContractAddress,
+        contract_address: AccountId,
         votable_object_id: VotableObjId,
     ) {
         let mut staker = self.internal_get_staker_or_panic();
@@ -594,7 +594,7 @@ impl StakingPositionContract {
         self.stakers.insert(&staker.id, &staker);
     }
 
-    pub fn unvote(&mut self, contract_address: ContractAddress, votable_object_id: VotableObjId) {
+    pub fn unvote(&mut self, contract_address: AccountId, votable_object_id: VotableObjId) {
         let mut staker = self.internal_get_staker_or_panic();
         let mut votes_for_address = staker.get_votes_for_address(
             &staker.id,
@@ -766,7 +766,7 @@ impl StakingPositionContract {
     // votes by app and votable_object
     pub fn get_total_votes(
         &self,
-        contract_address: ContractAddress,
+        contract_address: AccountId,
         votable_object_id: VotableObjId,
     ) -> U128 {
         let votes = match self.votes.get(&contract_address) {
@@ -779,7 +779,7 @@ impl StakingPositionContract {
     // votes by app (contract)
     pub fn get_votes_by_contract(
         &self,
-        contract_address: ContractAddress,
+        contract_address: AccountId,
     ) -> Vec<VotableObjectJSON> {
         let objects = self
             .votes
@@ -819,7 +819,7 @@ impl StakingPositionContract {
     pub fn get_votes_for_object(
         &self,
         account_id: AccountId,
-        contract_address: ContractAddress,
+        contract_address: AccountId,
         votable_object_id: VotableObjId,
     ) -> U128 {
         let staker = self.internal_get_staker(account_id);

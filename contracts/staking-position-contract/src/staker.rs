@@ -14,11 +14,11 @@ pub struct StakerJSON {
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Staker {
     pub id: AccountId,
-    /// The staker balance is denominated in AAXXII tokens.
+    /// The staker balance is denominated in the underlying ft token.
     pub balance: Balance,
     pub locking_positions: Vector<LockingPosition>,
     pub voting_power: VotingPower,
-    pub vote_positions: UnorderedMap<ContractAddress, UnorderedMap<VotableObjId, VotingPower>>,
+    pub vote_positions: UnorderedMap<AccountId, UnorderedMap<VotableObjId, VotingPower>>,
 }
 
 impl Staker {
@@ -105,8 +105,8 @@ impl Staker {
 
     pub(crate) fn get_votes_for_address(
         &self,
-        voter_id: &VoterId,
-        contract_address: &ContractAddress,
+        voter_id: &AccountId,
+        contract_address: &AccountId,
     ) -> UnorderedMap<VotableObjId, VotingPower> {
         let id = format!("{}-{}", voter_id.to_string(), contract_address.as_str());
         self.vote_positions

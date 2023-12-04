@@ -27,7 +27,7 @@ impl StakingPositionContract {
 
     fn internal_get_total_votes_for_address(
         &self,
-        contract_address: &ContractAddress,
+        contract_address: &AccountId,
     ) -> UnorderedMap<VotableObjId, VotingPower> {
         self.votes
             .get(&contract_address)
@@ -39,7 +39,7 @@ impl StakingPositionContract {
     pub(crate) fn internal_increase_total_votes(
         &mut self,
         voting_power: VotingPower,
-        contract_address: &ContractAddress,
+        contract_address: &AccountId,
         votable_object_id: &VotableObjId,
     ) {
         let mut votes_for_address = self.internal_get_total_votes_for_address(&contract_address);
@@ -53,7 +53,7 @@ impl StakingPositionContract {
     pub(crate) fn internal_decrease_total_votes(
         &mut self,
         voting_power: VotingPower,
-        contract_address: &ContractAddress,
+        contract_address: &AccountId,
         votable_object_id: &VotableObjId,
     ) {
         let mut votes_for_address = self.internal_get_total_votes_for_address(&contract_address);

@@ -8,10 +8,8 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 
 use crate::utils::generate_hash_id;
 
-pub type VoterId = AccountId;
 pub type VotingPower = u128;
 pub type Days = u16;
-pub type ContractAddress = AccountId;
 pub type VotableObjId = String;
 pub type EpochMillis = u64;
 pub type PositionIndex = u16;

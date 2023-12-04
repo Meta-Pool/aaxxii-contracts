@@ -18,3 +18,5 @@ workspaces/res/*.wasm
 contracts/neardev/
 contracts/neardev_ptoken/
 contracts/neardev_usdc/
+
+contracts/neardev_*/
