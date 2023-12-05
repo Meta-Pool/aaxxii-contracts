@@ -74,11 +74,14 @@ impl StakingPositionContract {
         amount: Balance,
         locking_period: Days
     ) -> VotingPower {
-        let multiplier = YOCTO_UNITS + proportional(
-            4 * YOCTO_UNITS,
-            (locking_period - self.min_locking_period) as u128,
-            (self.max_locking_period - self.min_locking_period) as u128
-        );
+        let multiplier = YOCTO_UNITS
+            + if self.max_locking_period > self.min_locking_period {
+                proportional(
+                    4 * YOCTO_UNITS,
+                    (locking_period - self.min_locking_period) as u128,
+                    (self.max_locking_period - self.min_locking_period) as u128
+                )
+            } else {0};
         proportional(amount, multiplier, YOCTO_UNITS)
     }
 
