@@ -21,43 +21,47 @@ pub const MAX_LOCKING_POSITIONS: u8 = 20;
 pub const MAX_VOTING_POSITIONS: u8 = 100;
 
 pub fn system_account() -> AccountId {
-    AccountId::new_unchecked("system.metavote.near".to_string())
+    AccountId::new_unchecked("system.staking.near".to_string())
 }
 
 pub fn contract_account() -> AccountId {
-    AccountId::new_unchecked("contract.metavote.near".to_string())
+    AccountId::new_unchecked("contract.staking.near".to_string())
 }
 
 pub fn treasury_account() -> AccountId {
-    AccountId::new_unchecked("treasury.metavote.near".to_string())
+    AccountId::new_unchecked("treasury.staking.near".to_string())
 }
 
 pub fn owner_account() -> AccountId {
-    AccountId::new_unchecked("owner.metavote.near".to_string())
+    AccountId::new_unchecked("owner.staking.near".to_string())
 }
 
 pub fn non_owner() -> AccountId {
-    AccountId::new_unchecked("non_owner.metavote.near".to_string())
+    AccountId::new_unchecked("non_owner.staking.near".to_string())
 }
 
 pub fn developer_account() -> AccountId {
-    AccountId::new_unchecked("developer.metavote.near".to_string())
+    AccountId::new_unchecked("developer.staking.near".to_string())
 }
 
 pub fn operator_account() -> AccountId {
-    AccountId::new_unchecked("operator.metavote.near".to_string())
+    AccountId::new_unchecked("operator.staking.near".to_string())
 }
 
-pub fn meta_token_account() -> AccountId {
-    AccountId::new_unchecked("meta-token.metavote.near".to_string())
+pub fn underlying_token_account() -> AccountId {
+    AccountId::new_unchecked("underlying-token.staking.near".to_string())
+}
+
+pub fn usdc_token_account() -> AccountId {
+    AccountId::new_unchecked("usdc.staking.near".to_string())
 }
 
 pub fn meta_pool_account() -> AccountId {
-    AccountId::new_unchecked("meta-pool.metavote.near".to_string())
+    AccountId::new_unchecked("meta-pool.staking.near".to_string())
 }
 
 pub fn voter_account() -> AccountId {
-    AccountId::new_unchecked("voter.metavote.near".to_string())
+    AccountId::new_unchecked("voter.staking.near".to_string())
 }
 
 pub fn voter_account_id(id: u8) -> AccountId {
@@ -69,7 +73,7 @@ pub fn compose_account(suffix: &str) -> AccountId {
 }
 
 pub fn votable_account() -> AccountId {
-    AccountId::new_unchecked("votable.metavote.near".to_string())
+    AccountId::new_unchecked("votable.staking.near".to_string())
 }
 
 pub fn ntoy(near_amount: u128) -> u128 {

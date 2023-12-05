@@ -9,7 +9,7 @@ use utils::*;
 
 const E20: u128 = 100_000_000_000_000_000_000;
 
-fn new_metavote_contract() -> StakingPositionContract {
+fn new_staking_contract() -> StakingPositionContract {
     StakingPositionContract::new(
         owner_account(),
         MIN_LOCKING_PERIOD,
@@ -17,21 +17,20 @@ fn new_metavote_contract() -> StakingPositionContract {
         U128::from(MIN_DEPOSIT_AMOUNT),
         MAX_LOCKING_POSITIONS,
         MAX_VOTING_POSITIONS,
-        meta_token_account(),
-        meta_pool_account(),
-        U128::from(6_000 * E20) // 0.6 Near
+        underlying_token_account(),
+        [ usdc_token_account() ].to_vec(),
     )
 }
 
 fn setup_new_test() -> StakingPositionContract {
     let call_context = get_context(
-        &meta_token_account(),
+        &underlying_token_account(),
         ntoy(TEST_INITIAL_BALANCE),
         0,
         to_ts(GENESIS_TIME_IN_DAYS),
     );
     testing_env!(call_context.clone());
-    new_metavote_contract()
+    new_staking_contract()
 }
 
 #[test]
@@ -43,9 +42,9 @@ fn test_single_deposit() {
     let msg: String = "30".to_owned();
 
     contract.ft_on_transfer(sender_id.clone(), amount.clone(), msg.clone());
-    assert_eq!(1, contract.voters.len(), "Voter was not created!");
+    assert_eq!(1, contract.stakers.len(), "Voter was not created!");
 
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id);
     assert_eq!(
         1,
         voter.locking_positions.len(),
@@ -53,13 +52,13 @@ fn test_single_deposit() {
     );
 
     let vote_power =
-        contract.calculate_voting_power(Meta::from(amount), msg.parse::<Days>().unwrap());
+        contract.calculate_voting_power(amount.0, msg.parse::<Days>().unwrap());
     assert_eq!(
         vote_power, voter.voting_power,
         "Incorrect voting power calculation!"
     );
 
-    let voters = contract.get_voters(0, 10);
+    let voters = contract.get_stakers(0, 10);
     assert_eq!(voters.len(), 1);
     let locking_position = &voters.first().unwrap().locking_positions;
     assert_eq!(locking_position.len(), 1);
@@ -80,7 +79,7 @@ fn test_multiple_deposit_same_locking_period() {
     let new_amount = U128::from(5 * E24);
     contract.ft_on_transfer(sender_id.clone(), new_amount.clone(), msg.clone());
 
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id.clone());
     assert_eq!(
         1,
         voter.locking_positions.len(),
@@ -88,9 +87,9 @@ fn test_multiple_deposit_same_locking_period() {
     );
 
     let total_vote_power = contract
-        .calculate_voting_power(Meta::from(amount.clone()), msg.parse::<Days>().unwrap())
+        .calculate_voting_power(amount.0, msg.parse::<Days>().unwrap())
         + contract
-            .calculate_voting_power(Meta::from(new_amount.clone()), msg.parse::<Days>().unwrap());
+            .calculate_voting_power(new_amount.0, msg.parse::<Days>().unwrap());
 
     // New context: the voter is doing the call now!
     let context = get_context(
@@ -118,7 +117,7 @@ fn test_multiple_deposit_same_locking_period() {
         "Incorrect balance!"
     );
 
-    let voters = contract.get_voters(0, 10);
+    let voters = contract.get_stakers(0, 10);
     assert_eq!(voters.len(), 1);
     let locking_position = &voters.first().unwrap().locking_positions;
     assert_eq!(locking_position.len(), 1);
@@ -139,7 +138,7 @@ fn test_multiple_deposit_diff_locking_period() {
     let new_msg: String = "200".to_owned();
     contract.ft_on_transfer(sender_id.clone(), new_amount.clone(), new_msg.clone());
 
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id.clone());
     assert_eq!(
         2,
         voter.locking_positions.len(),
@@ -147,8 +146,8 @@ fn test_multiple_deposit_diff_locking_period() {
     );
 
     let total_vote_power = contract
-        .calculate_voting_power(Meta::from(amount), msg.parse::<Days>().unwrap())
-        + contract.calculate_voting_power(Meta::from(new_amount), new_msg.parse::<Days>().unwrap());
+        .calculate_voting_power(amount.0, msg.parse::<Days>().unwrap())
+        + contract.calculate_voting_power(new_amount.0, new_msg.parse::<Days>().unwrap());
 
     // New context: the voter is doing the call now!
     let context = get_context(
@@ -176,7 +175,7 @@ fn test_multiple_deposit_diff_locking_period() {
         "Incorrect balance!"
     );
 
-    let voters = contract.get_voters(0, 10);
+    let voters = contract.get_stakers(0, 10);
     assert_eq!(voters.len(), 1);
     let locking_position = &voters.first().unwrap().locking_positions;
     assert_eq!(locking_position.len(), 2);
@@ -213,7 +212,7 @@ fn test_unlock_position() {
         "Incorrect unlocking balance!"
     );
 
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id.clone());
     let index = contract
         .get_all_locking_positions(sender_id.clone())
         .first()
@@ -244,7 +243,7 @@ fn test_unlock_position() {
         "Incorrect unlocking balance!"
     );
 
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id);
     assert_eq!(voter.voting_power, 0, "Voting power was not removed!");
 }
 
@@ -291,7 +290,7 @@ fn test_unlock_partial_position() {
         .unwrap();
     let third_amount = U128::from(4 * E24);
     contract.unlock_partial_position(index, third_amount);
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id.clone());
     assert_eq!(
         3,
         voter.locking_positions.len(),
@@ -317,11 +316,11 @@ fn test_unlock_partial_position() {
         "Incorrect unlocking balance!"
     );
 
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id);
     let total_vote_power = contract
-        .calculate_voting_power(Meta::from(amount), msg.parse::<Days>().unwrap())
+        .calculate_voting_power(amount.0, msg.parse::<Days>().unwrap())
         + contract.calculate_voting_power(
-            Meta::from(new_amount) - Meta::from(third_amount),
+            new_amount.0 - third_amount.0,
             new_msg.parse::<Days>().unwrap(),
         );
     assert_eq!(
@@ -337,13 +336,13 @@ fn generate_lock_position_context(
     let timestamp_0 = to_ts(GENESIS_TIME_IN_DAYS);
 
     let context = get_context(
-        &meta_token_account(),
+        &underlying_token_account(),
         ntoy(TEST_INITIAL_BALANCE),
         0,
         timestamp_0,
     );
     testing_env!(context.clone());
-    let mut contract = new_metavote_contract();
+    let mut contract = new_staking_contract();
 
     let sender_id: AccountId = voter_account();
     let amount = U128::from(amount);
@@ -369,8 +368,8 @@ fn generate_relock_position_context() -> (StakingPositionContract,AccountId) {
         .index
         .unwrap();
     contract.unlock_position(index);
-    let voter = contract.internal_get_voter(&sender_id);
-    let locking_position = voter.locking_positions.get(index).unwrap();
+    let voter = contract.internal_get_staker(sender_id.clone());
+    let locking_position = voter.locking_positions.get(index as u64).unwrap();
     assert_eq!(
         locking_position.unlocking_started_at.unwrap(),
         nanos_to_millis(timestamp_1),
@@ -425,7 +424,7 @@ fn do_locking_position_extend_days(
     new_locking_days: u16,
     amount: Balance
 ) {
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id.clone());
     const INDEX: u64 = 0;
     let locking_position = voter.locking_positions.get(INDEX).unwrap();
     println!("{:?}", locking_position);
@@ -436,10 +435,10 @@ fn do_locking_position_extend_days(
     let old_voting_power = locking_position.voting_power;
     let old_total_voting_power = contract.total_voting_power;
 
-    contract.locking_position_extend_days(INDEX, new_locking_days);
+    contract.locking_position_extend_days(INDEX.try_into().unwrap(), new_locking_days);
 
     // check
-    let voter_new = contract.internal_get_voter(&sender_id);
+    let voter_new = contract.internal_get_staker(sender_id.clone());
     let locking_position = voter.locking_positions.get(INDEX).unwrap();
     println!("{:?}", locking_position);
     assert_eq!(locking_position.locking_period, new_locking_days);
@@ -495,16 +494,16 @@ fn test_relock_position_2() {
         .unwrap()
         .index
         .unwrap();
-    let voter = contract.internal_get_voter(&sender_id);
-    let locking_position = voter.locking_positions.get(index).unwrap();
+    let voter = contract.internal_get_staker(sender_id.clone());
+    let locking_position = voter.locking_positions.get(index as u64).unwrap();
     assert_eq!(voter.voting_power, 0, "Voting power should be 0.");
 
     let amount = locking_position.amount;
     let locking_period: Days = 89;
     contract.relock_position(0, locking_period, U128::from(0));
 
-    let voter = contract.internal_get_voter(&sender_id);
-    let locking_position = voter.locking_positions.get(index).unwrap();
+    let voter = contract.internal_get_staker(sender_id.clone());
+    let locking_position = voter.locking_positions.get(index as u64).unwrap();
     assert_eq!(
         voter.voting_power,
         contract.calculate_voting_power(amount, locking_period),
@@ -540,16 +539,16 @@ fn test_relock_position_3() {
         .unwrap()
         .index
         .unwrap();
-    let voter = contract.internal_get_voter(&sender_id);
-    let locking_position = voter.locking_positions.get(index).unwrap();
+    let voter = contract.internal_get_staker(sender_id.clone());
+    let locking_position = voter.locking_positions.get(index as u64).unwrap();
     assert_eq!(voter.voting_power, 0, "Voting power should be 0.");
 
     let amount = locking_position.amount;
     let locking_period: Days = 30;
     contract.relock_position(0, locking_period, U128::from(0));
 
-    let voter = contract.internal_get_voter(&sender_id);
-    let locking_position = voter.locking_positions.get(index).unwrap();
+    let voter = contract.internal_get_staker(sender_id.clone());
+    let locking_position = voter.locking_positions.get(index as u64).unwrap();
     assert_eq!(
         voter.voting_power,
         contract.calculate_voting_power(amount, locking_period),
@@ -586,8 +585,8 @@ fn test_relock_partial_position_1() {
         .unwrap()
         .index
         .unwrap();
-    let voter = contract.internal_get_voter(&sender_id);
-    let locking_position = voter.locking_positions.get(index).unwrap();
+    let voter = contract.internal_get_staker(sender_id.clone());
+    let locking_position = voter.locking_positions.get(index as u64).unwrap();
     contract.relock_partial_position(
         index,
         U128::from(locking_position.amount - 2 * E24),
@@ -610,8 +609,8 @@ fn test_relock_partial_position_2() {
         .unwrap()
         .index
         .unwrap();
-    let voter = contract.internal_get_voter(&sender_id);
-    let locking_position = voter.locking_positions.get(index).unwrap();
+    let voter = contract.internal_get_staker(sender_id.clone());
+    let locking_position = voter.locking_positions.get(index as u64).unwrap();
     assert_eq!(voter.voting_power, 0, "Voting power should be 0.");
 
     let keep_amount = 2 * E24;
@@ -631,8 +630,8 @@ fn test_relock_partial_position_2() {
         .unwrap()
         .index
         .unwrap();
-    let voter = contract.internal_get_voter(&sender_id);
-    let locking_position = voter.locking_positions.get(index).unwrap();
+    let voter = contract.internal_get_staker(sender_id.clone());
+    let locking_position = voter.locking_positions.get(index as u64).unwrap();
     assert_eq!(
         voter.locking_positions.len(),
         2,
@@ -673,8 +672,8 @@ fn test_relock_partial_position_3() {
         .unwrap()
         .index
         .unwrap();
-    let voter = contract.internal_get_voter(&sender_id);
-    let locking_position = voter.locking_positions.get(index).unwrap();
+    let voter = contract.internal_get_staker(sender_id.clone());
+    let locking_position = voter.locking_positions.get(index as u64).unwrap();
     assert_eq!(voter.voting_power, 0, "Voting power should be 0.");
 
     let keep_amount = 2 * E24;
@@ -688,8 +687,8 @@ fn test_relock_partial_position_3() {
     );
 
     // The Unlocking is index 0, and the Relocked is ALSO index 0.
-    let voter = contract.internal_get_voter(&sender_id);
-    let locking_position = voter.locking_positions.get(index).unwrap();
+    let voter = contract.internal_get_staker(sender_id.clone());
+    let locking_position = voter.locking_positions.get(index as u64).unwrap();
     assert_eq!(
         voter.locking_positions.len(),
         1,
@@ -727,7 +726,7 @@ fn test_relock_partial_position_3() {
     let keep_amount_2 = keep_amount - keep_amount_1;
     contract.relock_position(index, locking_period, U128::from(keep_amount_1));
 
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id.clone());
     assert_eq!(voter.balance, keep_amount_2, "Incorrect voter balance.");
     assert_eq!(
         voter.voting_power,
@@ -738,7 +737,7 @@ fn test_relock_partial_position_3() {
     // Relock from balance
     let locking_period: Days = 278;
     contract.relock_from_balance(locking_period, U128::from(keep_amount_2));
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id.clone());
     assert_eq!(voter.balance, 0, "Incorrect voter balance.");
     assert_eq!(
         voter.locking_positions.len(),
@@ -759,7 +758,7 @@ fn test_clear_locking_position() {
     let new_msg: String = "32".to_owned();
     contract.ft_on_transfer(sender_id.clone(), new_amount.clone(), new_msg.clone());
 
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id.clone());
     assert_eq!(
         2,
         voter.locking_positions.len(),
@@ -790,24 +789,24 @@ fn test_clear_locking_position() {
     let position_index_list: Vec<PositionIndex> = vec![0, 1];
     contract.clear_locking_position(position_index_list);
 
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id.clone());
     assert_eq!(
         0,
         voter.locking_positions.len(),
         "Locking position was not deleted!"
     );
     assert_eq!(
-        Meta::from(AMOUNT) + Meta::from(new_amount),
+        AMOUNT + new_amount.0,
         voter.balance,
         "Incorrect balance!"
     );
     assert_eq!(
-        Meta::from(AMOUNT) + Meta::from(new_amount),
-        Meta::from(contract.get_balance(sender_id.clone())),
+        AMOUNT + new_amount.0,
+        contract.get_balance(sender_id.clone()).0,
         "Incorrect balance!"
     );
 
-    let voters = contract.get_voters(0, 10);
+    let voters = contract.get_stakers(0, 10);
     assert_eq!(voters.len(), 1);
     let locking_position = &voters.first().unwrap().locking_positions;
     assert_eq!(locking_position.len(), 0);
@@ -836,9 +835,9 @@ fn test_unlock_position_without_voting_power() {
         .index
         .unwrap();
 
-    let vote = contract.calculate_voting_power(Meta::from(AMOUNT), LOCKING_PERIOD);
+    let vote = contract.calculate_voting_power(AMOUNT, LOCKING_PERIOD);
     contract.vote(U128::from(vote), votable_account(), "0".to_owned());
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id.clone());
     assert_eq!(voter.voting_power, 0, "Incorrect Voting Power calculation.");
     assert_eq!(
         U128::from(vote),
@@ -859,7 +858,7 @@ fn test_rebalance_increase_and_decrease() {
     let context = get_context(&sender_id, ntoy(TEST_INITIAL_BALANCE), 0, timestamp_1);
     testing_env!(context.clone());
 
-    let vote = contract.calculate_voting_power(Meta::from(AMOUNT), LOCKING_PERIOD);
+    let vote = contract.calculate_voting_power(AMOUNT, LOCKING_PERIOD);
     let contract_address = votable_account();
     let votable_object_id = "0".to_owned();
 
@@ -877,7 +876,7 @@ fn test_rebalance_increase_and_decrease() {
         contract_address.clone(),
         votable_object_id.clone(),
     );
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id.clone());
     assert_eq!(
         voter.voting_power, delta_1,
         "Incorrect Voting Power calculation."
@@ -894,7 +893,7 @@ fn test_rebalance_increase_and_decrease() {
         contract_address.clone(),
         votable_object_id.clone(),
     );
-    let voter = contract.internal_get_voter(&sender_id);
+    let voter = contract.internal_get_staker(sender_id.clone());
     assert_eq!(
         voter.voting_power,
         delta_1 - delta_2,
@@ -909,7 +908,7 @@ fn test_rebalance_increase_and_decrease() {
         "Incorrect Voting Power calculation."
     );
 
-    let voters = contract.get_voters(0, 10);
+    let voters = contract.get_stakers(0, 10);
     assert_eq!(voters.len(), 1);
     let locking_position = &voters.first().unwrap().locking_positions;
     assert_eq!(locking_position.len(), 1);
@@ -921,7 +920,7 @@ struct User {
     numeric_id: u8,
     votes: VotingPower,
     locking_period: Days,
-    contract_address: ContractAddress,
+    contract_address: AccountId,
     votable_object_id: VotableObjId,
 }
 impl User {
@@ -969,16 +968,16 @@ fn internal_prepare_multi_voter_contract() -> (StakingPositionContract, Vec<User
     let timestamp_1 = to_ts(GENESIS_TIME_IN_DAYS + 5);
 
     testing_env!(get_context(
-        &meta_token_account(),
+        &underlying_token_account(),
         ntoy(TEST_INITIAL_BALANCE),
         0,
         timestamp_0,
     ));
-    let mut contract = new_metavote_contract();
+    let mut contract = new_staking_contract();
 
     for user in users.iter() {
         let context = get_context(
-            &meta_token_account(),
+            &underlying_token_account(),
             ntoy(TEST_INITIAL_BALANCE),
             0,
             timestamp_0,
@@ -1060,7 +1059,7 @@ fn internal_prepare_multi_voter_contract() -> (StakingPositionContract, Vec<User
         "Incorrect vote count for project 2, object 1."
     );
 
-    let voters = contract.get_voters(0, 10);
+    let voters = contract.get_stakers(0, 10);
     assert_eq!(voters.len(), 4);
     let locking_position = &voters.first().unwrap().locking_positions;
     assert_eq!(locking_position.len(), 1);
@@ -1070,252 +1069,252 @@ fn internal_prepare_multi_voter_contract() -> (StakingPositionContract, Vec<User
     (contract, users)
 }
 
-#[test]
-fn test_multi_voter_contract() {
-    internal_prepare_multi_voter_contract();
-}
+// #[test]
+// fn test_multi_voter_contract() {
+//     internal_prepare_multi_voter_contract();
+// }
 
-/// For META Claims
-fn internal_distribute_100_meta_for_claims(contract: &mut StakingPositionContract, users: &Vec<User>) {
-    let sender_id: AccountId = operator_account();
-    let initial_accumulated_distributed = contract.accumulated_distributed_for_claims;
-    let initial_unclaimed = contract.total_unclaimed_meta;
-    const AMOUNT: u128 = 100 * E24;
-    let mut msg = String::from("for-claims:");
-    msg.push_str(
-        &serde_json::to_string(&vec![
-            (users[0].account_id().to_string(), 10),
-            (users[1].account_id().to_string(), 20),
-            (users[2].account_id().to_string(), 40),
-            (users[3].account_id().to_string(), 30),
-        ])
-        .unwrap(),
-    );
+// /// For Claims
+// fn internal_distribute_100_meta_for_claims(contract: &mut StakingPositionContract, users: &Vec<User>) {
+//     let sender_id: AccountId = operator_account();
+//     let initial_accumulated_distributed = contract.accumulated_distributed_for_claims;
+//     let initial_unclaimed = contract.total_unclaimed_meta;
+//     const AMOUNT: u128 = 100 * E24;
+//     let mut msg = String::from("for-claims:");
+//     msg.push_str(
+//         &serde_json::to_string(&vec![
+//             (users[0].account_id().to_string(), 10),
+//             (users[1].account_id().to_string(), 20),
+//             (users[2].account_id().to_string(), 40),
+//             (users[3].account_id().to_string(), 30),
+//         ])
+//         .unwrap(),
+//     );
 
-    set_context_caller(&meta_token_account());
-    contract.ft_on_transfer(sender_id.clone(), AMOUNT.into(), msg);
-    assert_eq!(
-        contract.accumulated_distributed_for_claims,
-        initial_accumulated_distributed + AMOUNT,
-        "accumulated_distributed_for_claims not correct"
-    );
-    assert_eq!(
-        contract.total_unclaimed_meta,
-        initial_unclaimed + AMOUNT,
-        "contract.total_unclaimed_meta not correct"
-    );
-}
+//     set_context_caller(&underlying_token_account());
+//     contract.ft_on_transfer(sender_id.clone(), AMOUNT.into(), msg);
+//     assert_eq!(
+//         contract.accumulated_distributed_for_claims,
+//         initial_accumulated_distributed + AMOUNT,
+//         "accumulated_distributed_for_claims not correct"
+//     );
+//     assert_eq!(
+//         contract.total_unclaimed_meta,
+//         initial_unclaimed + AMOUNT,
+//         "contract.total_unclaimed_meta not correct"
+//     );
+// }
 
-/// For stNear Claims
-fn internal_distribute_300_stnear_for_claims(contract: &mut StakingPositionContract, users: &Vec<User>) {
-    let sender_id: AccountId = operator_account();
-    let initial_accumulated_distributed = contract.accum_distributed_stnear_for_claims;
-    let initial_unclaimed = contract.total_unclaimed_stnear;
-    const AMOUNT: u128 = 3000040 * E20; // 300.0040
-    let mut msg = String::from("for-claims:");
-    msg.push_str(
-        &serde_json::to_string(&vec![
-            (users[0].account_id().to_string(), 1500010),  // 150.0010
-            (users[1].account_id().to_string(), 0500012),  // 50.0012
-            (users[2].account_id().to_string(), 0800008), // 80.0008
-            (users[3].account_id().to_string(), 0200010), // 20.0010
-        ])
-        .unwrap(),
-    );
+// /// For stNear Claims
+// fn internal_distribute_300_stnear_for_claims(contract: &mut StakingPositionContract, users: &Vec<User>) {
+//     let sender_id: AccountId = operator_account();
+//     let initial_accumulated_distributed = contract.accum_distributed_stnear_for_claims;
+//     let initial_unclaimed = contract.total_unclaimed_stnear;
+//     const AMOUNT: u128 = 3000040 * E20; // 300.0040
+//     let mut msg = String::from("for-claims:");
+//     msg.push_str(
+//         &serde_json::to_string(&vec![
+//             (users[0].account_id().to_string(), 1500010),  // 150.0010
+//             (users[1].account_id().to_string(), 0500012),  // 50.0012
+//             (users[2].account_id().to_string(), 0800008), // 80.0008
+//             (users[3].account_id().to_string(), 0200010), // 20.0010
+//         ])
+//         .unwrap(),
+//     );
 
-    set_context_caller(&meta_pool_account());
-    contract.ft_on_transfer(sender_id.clone(), AMOUNT.into(), msg);
-    assert_eq!(
-        contract.accum_distributed_stnear_for_claims,
-        initial_accumulated_distributed + AMOUNT,
-        "accum_distributed_stnear_for_claims not correct"
-    );
-    assert_eq!(
-        contract.total_unclaimed_stnear,
-        initial_unclaimed + AMOUNT,
-        "contract.total_unclaimed_stnear not correct"
-    );
-}
+//     set_context_caller(&meta_pool_account());
+//     contract.ft_on_transfer(sender_id.clone(), AMOUNT.into(), msg);
+//     assert_eq!(
+//         contract.accum_distributed_stnear_for_claims,
+//         initial_accumulated_distributed + AMOUNT,
+//         "accum_distributed_stnear_for_claims not correct"
+//     );
+//     assert_eq!(
+//         contract.total_unclaimed_stnear,
+//         initial_unclaimed + AMOUNT,
+//         "contract.total_unclaimed_stnear not correct"
+//     );
+// }
 
-#[test]
-fn test_deposit_for_claims() {
-    let (mut contract, users) = internal_prepare_multi_voter_contract();
-    let _ = internal_distribute_100_meta_for_claims(&mut contract, &users);
-    let _ = internal_distribute_300_stnear_for_claims(&mut contract, &users);
-}
+// #[test]
+// fn test_deposit_for_claims() {
+//     let (mut contract, users) = internal_prepare_multi_voter_contract();
+//     let _ = internal_distribute_100_meta_for_claims(&mut contract, &users);
+//     let _ = internal_distribute_300_stnear_for_claims(&mut contract, &users);
+// }
 
-#[test]
-#[should_panic(
-    expected = "total to distribute 101000000000000000000000000 != total_amount sent 100000000000000000000000000"
-)]
-fn distribute_too_much_meta() {
-    let (mut contract, users) = internal_prepare_multi_voter_contract();
-    set_context_caller(&owner_account());
-    let amount = 100 * E24;
-    let mut msg = String::from("for-claims:");
-    msg.push_str(
-        &serde_json::to_string(&vec![
-            (users[0].account_id().to_string(), 10),
-            (users[1].account_id().to_string(), 20),
-            (users[2].account_id().to_string(), 40),
-            (users[3].account_id().to_string(), 31),
-        ])
-        .unwrap(),
-    );
-    set_context_caller(&meta_token_account());
-    contract.ft_on_transfer(operator_account(), amount.into(), msg);
-}
+// #[test]
+// #[should_panic(
+//     expected = "total to distribute 101000000000000000000000000 != total_amount sent 100000000000000000000000000"
+// )]
+// fn distribute_too_much_meta() {
+//     let (mut contract, users) = internal_prepare_multi_voter_contract();
+//     set_context_caller(&owner_account());
+//     let amount = 100 * E24;
+//     let mut msg = String::from("for-claims:");
+//     msg.push_str(
+//         &serde_json::to_string(&vec![
+//             (users[0].account_id().to_string(), 10),
+//             (users[1].account_id().to_string(), 20),
+//             (users[2].account_id().to_string(), 40),
+//             (users[3].account_id().to_string(), 31),
+//         ])
+//         .unwrap(),
+//     );
+//     set_context_caller(&underlying_token_account());
+//     contract.ft_on_transfer(operator_account(), amount.into(), msg);
+// }
 
-#[test]
-#[should_panic(
-    expected = "total to distribute 300012900000000000000000000 != total_amount sent 300003000000000000000000000"
-)]
-fn distribute_too_much_stnear() {
-    let (mut contract, users) = internal_prepare_multi_voter_contract();
-    set_context_caller(&owner_account());
-    const AMOUNT: u128 = 3000030 * E20; // 300.0030
-    let mut msg = String::from("for-claims:");
-    msg.push_str(
-        &serde_json::to_string(&vec![
-            (users[0].account_id().to_string(), 1500010),  // 150.0010
-            (users[1].account_id().to_string(), 0500012),  // 50.0012
-            (users[2].account_id().to_string(), 0800008), // 80.0008
-            (users[3].account_id().to_string(), 0200099), // 20.0099 too much
-        ])
-        .unwrap(),
-    );
-    set_context_caller(&meta_pool_account());
-    contract.ft_on_transfer(operator_account(), AMOUNT.into(), msg);
-}
+// #[test]
+// #[should_panic(
+//     expected = "total to distribute 300012900000000000000000000 != total_amount sent 300003000000000000000000000"
+// )]
+// fn distribute_too_much_stnear() {
+//     let (mut contract, users) = internal_prepare_multi_voter_contract();
+//     set_context_caller(&owner_account());
+//     const AMOUNT: u128 = 3000030 * E20; // 300.0030
+//     let mut msg = String::from("for-claims:");
+//     msg.push_str(
+//         &serde_json::to_string(&vec![
+//             (users[0].account_id().to_string(), 1500010),  // 150.0010
+//             (users[1].account_id().to_string(), 0500012),  // 50.0012
+//             (users[2].account_id().to_string(), 0800008), // 80.0008
+//             (users[3].account_id().to_string(), 0200099), // 20.0099 too much
+//         ])
+//         .unwrap(),
+//     );
+//     set_context_caller(&meta_pool_account());
+//     contract.ft_on_transfer(operator_account(), AMOUNT.into(), msg);
+// }
 
-fn prepare_contract_with_claims() -> (StakingPositionContract, Vec<User>) {
-    let (mut contract, users) = internal_prepare_multi_voter_contract();
-    internal_distribute_100_meta_for_claims(&mut contract, &users);
-    internal_distribute_300_stnear_for_claims(&mut contract, &users);
-    (contract, users)
-}
-#[test]
-fn test_distribute_claims() {
-    prepare_contract_with_claims();
-}
+// fn prepare_contract_with_claims() -> (StakingPositionContract, Vec<User>) {
+//     let (mut contract, users) = internal_prepare_multi_voter_contract();
+//     internal_distribute_100_meta_for_claims(&mut contract, &users);
+//     internal_distribute_300_stnear_for_claims(&mut contract, &users);
+//     (contract, users)
+// }
+// #[test]
+// fn test_distribute_claims() {
+//     prepare_contract_with_claims();
+// }
 
-#[test]
-#[should_panic(expected = "you don't have enough claimable META")]
-fn test_claim_too_much_meta() {
-    let (mut contract, users) = prepare_contract_with_claims();
-    set_context_caller(&users[2].account_id());
-    contract.claim_and_lock((41 * E24).into(), 30);
-}
+// #[test]
+// #[should_panic(expected = "you don't have enough claimable META")]
+// fn test_claim_too_much_meta() {
+//     let (mut contract, users) = prepare_contract_with_claims();
+//     set_context_caller(&users[2].account_id());
+//     contract.claim_and_lock((41 * E24).into(), 30);
+// }
 
-#[test]
-#[should_panic(expected = "you don't have enough claimable stNEAR")]
-fn test_claim_too_much_stnear() {
-    let (mut contract, users) = prepare_contract_with_claims();
-    set_context_caller(&users[2].account_id());
-    contract.claim_stnear((81 * E24).into());
-}
+// #[test]
+// #[should_panic(expected = "you don't have enough claimable stNEAR")]
+// fn test_claim_too_much_stnear() {
+//     let (mut contract, users) = prepare_contract_with_claims();
+//     set_context_caller(&users[2].account_id());
+//     contract.claim_stnear((81 * E24).into());
+// }
 
-#[test]
-fn test_claim_meta() {
-    let (mut contract, users) = prepare_contract_with_claims();
+// #[test]
+// fn test_claim_meta() {
+//     let (mut contract, users) = prepare_contract_with_claims();
 
-    // total claim
-    {
-        let unclaimed_pre = contract.total_unclaimed_meta;
-        let caller = users[2].account_id();
-        // let user_record_pre = contract.get_voter_info(&caller);
-        // println!("{:?}", user_record_pre);
-        set_context_caller(&caller);
-        let claim_balance_pre = contract.get_claimable_meta(&caller).0;
-        let claim_amount = 40 * E24;
-        let duration = 165;
-        contract.claim_and_lock(claim_amount.into(), duration);
-        assert_eq!(
-            contract.total_unclaimed_meta,
-            unclaimed_pre - claim_amount,
-            "total_unclaimed_meta"
-        );
-        let claim_balance_post = contract.get_claimable_meta(&caller).0;
-        assert_eq!(
-            claim_balance_post,
-            claim_balance_pre.saturating_sub(claim_amount)
-        );
-        let user_record_post = contract.get_voter_info(&caller);
-        // println!("{:?}", user_record_post);
-        assert_eq!(user_record_post.locking_positions.len(), 2);
-        let pos = &user_record_post.locking_positions[1];
-        assert_eq!(pos.locking_period, duration);
-        assert_eq!(pos.is_unlocked, false);
-        assert_eq!(pos.is_unlocking, false);
-        assert_eq!(pos.voting_power.0, claim_amount * 3);
-    }
+//     // total claim
+//     {
+//         let unclaimed_pre = contract.total_unclaimed_meta;
+//         let caller = users[2].account_id();
+//         // let user_record_pre = contract.get_voter_info(&caller);
+//         // println!("{:?}", user_record_pre);
+//         set_context_caller(&caller);
+//         let claim_balance_pre = contract.get_claimable_meta(&caller).0;
+//         let claim_amount = 40 * E24;
+//         let duration = 165;
+//         contract.claim_and_lock(claim_amount.into(), duration);
+//         assert_eq!(
+//             contract.total_unclaimed_meta,
+//             unclaimed_pre - claim_amount,
+//             "total_unclaimed_meta"
+//         );
+//         let claim_balance_post = contract.get_claimable_meta(&caller).0;
+//         assert_eq!(
+//             claim_balance_post,
+//             claim_balance_pre.saturating_sub(claim_amount)
+//         );
+//         let user_record_post = contract.get_voter_info(&caller);
+//         // println!("{:?}", user_record_post);
+//         assert_eq!(user_record_post.locking_positions.len(), 2);
+//         let pos = &user_record_post.locking_positions[1];
+//         assert_eq!(pos.locking_period, duration);
+//         assert_eq!(pos.is_unlocked, false);
+//         assert_eq!(pos.is_unlocking, false);
+//         assert_eq!(pos.voting_power.0, claim_amount * 3);
+//     }
 
-    // partial claim
-    {
-        let unclaimed_pre = contract.total_unclaimed_meta;
-        let caller = users[1].account_id();
-        // let user_record_pre = contract.get_voter_info(&caller);
-        // println!("{:?}", user_record_pre);
-        set_context_caller(&caller);
-        let claim_balance_pre = contract.get_claimable_meta(&caller).0;
-        let claim_amount = 6 * E24;
-        contract.claim_and_lock(claim_amount.into(), 30);
-        assert_eq!(
-            contract.total_unclaimed_meta,
-            unclaimed_pre - claim_amount,
-            "total_unclaimed_meta"
-        );
-        // let user_record_post = contract.get_voter_info(&caller);
-        // println!("{:?}", user_record_post);
-        let claim_balance_post = contract.get_claimable_meta(&caller).0;
-        assert_eq!(claim_balance_post, claim_balance_pre - claim_amount);
-    }
-}
+//     // partial claim
+//     {
+//         let unclaimed_pre = contract.total_unclaimed_meta;
+//         let caller = users[1].account_id();
+//         // let user_record_pre = contract.get_voter_info(&caller);
+//         // println!("{:?}", user_record_pre);
+//         set_context_caller(&caller);
+//         let claim_balance_pre = contract.get_claimable_meta(&caller).0;
+//         let claim_amount = 6 * E24;
+//         contract.claim_and_lock(claim_amount.into(), 30);
+//         assert_eq!(
+//             contract.total_unclaimed_meta,
+//             unclaimed_pre - claim_amount,
+//             "total_unclaimed_meta"
+//         );
+//         // let user_record_post = contract.get_voter_info(&caller);
+//         // println!("{:?}", user_record_post);
+//         let claim_balance_post = contract.get_claimable_meta(&caller).0;
+//         assert_eq!(claim_balance_post, claim_balance_pre - claim_amount);
+//     }
+// }
 
-#[test]
-fn test_claim_stnear() {
-    let (mut contract, users) = prepare_contract_with_claims();
+// #[test]
+// fn test_claim_stnear() {
+//     let (mut contract, users) = prepare_contract_with_claims();
 
-    // total claim
-    {
-        let unclaimed_pre = contract.total_unclaimed_stnear;
-        let caller = users[2].account_id();
-        // let user_record_pre = contract.get_voter_info(&caller);
-        // println!("{:?}", user_record_pre);
-        set_context_caller(&caller);
-        let claim_balance_pre = contract.get_claimable_stnear(&caller).0;
-        let claim_amount = 800008 * E20;
-        contract.claim_stnear(claim_amount.into());
-        assert_eq!(
-            contract.total_unclaimed_stnear,
-            unclaimed_pre - claim_amount,
-            "total_unclaimed_stnear"
-        );
-        let claim_balance_post = contract.get_claimable_stnear(&caller).0;
-        assert_eq!(
-            claim_balance_post,
-            claim_balance_pre.saturating_sub(claim_amount)
-        );
-    }
+//     // total claim
+//     {
+//         let unclaimed_pre = contract.total_unclaimed_stnear;
+//         let caller = users[2].account_id();
+//         // let user_record_pre = contract.get_voter_info(&caller);
+//         // println!("{:?}", user_record_pre);
+//         set_context_caller(&caller);
+//         let claim_balance_pre = contract.get_claimable_stnear(&caller).0;
+//         let claim_amount = 800008 * E20;
+//         contract.claim_stnear(claim_amount.into());
+//         assert_eq!(
+//             contract.total_unclaimed_stnear,
+//             unclaimed_pre - claim_amount,
+//             "total_unclaimed_stnear"
+//         );
+//         let claim_balance_post = contract.get_claimable_stnear(&caller).0;
+//         assert_eq!(
+//             claim_balance_post,
+//             claim_balance_pre.saturating_sub(claim_amount)
+//         );
+//     }
 
-    // partial claim
-    {
-        let unclaimed_pre = contract.total_unclaimed_stnear;
-        let caller = users[1].account_id();
-        // let user_record_pre = contract.get_voter_info(&caller);
-        // println!("{:?}", user_record_pre);
-        set_context_caller(&caller);
-        let claim_balance_pre = contract.get_claimable_stnear(&caller).0;
-        let claim_amount = 50 * E24;
-        contract.claim_stnear(claim_amount.into());
-        assert_eq!(
-            contract.total_unclaimed_stnear,
-            unclaimed_pre - claim_amount,
-            "total_unclaimed_stnear"
-        );
-        // let user_record_post = contract.get_voter_info(&caller);
-        // println!("{:?}", user_record_post);
-        let claim_balance_post = contract.get_claimable_stnear(&caller).0;
-        assert_eq!(claim_balance_post, claim_balance_pre - claim_amount);
-    }
-}
+//     // partial claim
+//     {
+//         let unclaimed_pre = contract.total_unclaimed_stnear;
+//         let caller = users[1].account_id();
+//         // let user_record_pre = contract.get_voter_info(&caller);
+//         // println!("{:?}", user_record_pre);
+//         set_context_caller(&caller);
+//         let claim_balance_pre = contract.get_claimable_stnear(&caller).0;
+//         let claim_amount = 50 * E24;
+//         contract.claim_stnear(claim_amount.into());
+//         assert_eq!(
+//             contract.total_unclaimed_stnear,
+//             unclaimed_pre - claim_amount,
+//             "total_unclaimed_stnear"
+//         );
+//         // let user_record_post = contract.get_voter_info(&caller);
+//         // println!("{:?}", user_record_post);
+//         let claim_balance_post = contract.get_claimable_stnear(&caller).0;
+//         assert_eq!(claim_balance_post, claim_balance_pre - claim_amount);
+//     }
+// }

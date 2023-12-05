@@ -98,6 +98,23 @@ impl StakingPositionContract {
         self.insert_new_ft(&new_value);
     }
 
+    #[payable]
+    pub fn update_locking_period(
+        &mut self,
+        min_locking_period: Days,
+        max_locking_period: Days
+    ) {
+        assert_one_yocto();
+        self.assert_only_owner();
+        require!(
+            min_locking_period <= max_locking_period,
+            "Review the min and max locking period"
+        );
+
+        self.min_locking_period = min_locking_period;
+        self.max_locking_period = max_locking_period;
+    }
+
     // *********
     // * claim *
     // *********
@@ -624,15 +641,6 @@ impl StakingPositionContract {
 
         // Update contract state.
         self.internal_decrease_total_votes(votes, &contract_address, &votable_object_id);
-    }
-
-    // *********
-    // * Admin *
-    // *********
-
-    pub fn update_min_locking_period(&mut self, new_period: Days) {
-        self.assert_only_owner();
-        self.min_locking_period = new_period;
     }
 
     /**********************/
