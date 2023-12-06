@@ -1069,79 +1069,97 @@ fn internal_prepare_multi_voter_contract() -> (StakingPositionContract, Vec<User
     (contract, users)
 }
 
-// #[test]
-// fn test_multi_voter_contract() {
-//     internal_prepare_multi_voter_contract();
-// }
+#[test]
+fn test_multi_voter_contract() {
+    internal_prepare_multi_voter_contract();
+}
 
-// /// For Claims
-// fn internal_distribute_100_meta_for_claims(contract: &mut StakingPositionContract, users: &Vec<User>) {
-//     let sender_id: AccountId = operator_account();
-//     let initial_accumulated_distributed = contract.accumulated_distributed_for_claims;
-//     let initial_unclaimed = contract.total_unclaimed_meta;
-//     const AMOUNT: u128 = 100 * E24;
-//     let mut msg = String::from("for-claims:");
-//     msg.push_str(
-//         &serde_json::to_string(&vec![
-//             (users[0].account_id().to_string(), 10),
-//             (users[1].account_id().to_string(), 20),
-//             (users[2].account_id().to_string(), 40),
-//             (users[3].account_id().to_string(), 30),
-//         ])
-//         .unwrap(),
-//     );
+// NOTICE: get_context2 uses the most modern way of testing in NEAR.
+use near_sdk::test_utils::{accounts, VMContextBuilder};
 
-//     set_context_caller(&underlying_token_account());
-//     contract.ft_on_transfer(sender_id.clone(), AMOUNT.into(), msg);
-//     assert_eq!(
-//         contract.accumulated_distributed_for_claims,
-//         initial_accumulated_distributed + AMOUNT,
-//         "accumulated_distributed_for_claims not correct"
-//     );
-//     assert_eq!(
-//         contract.total_unclaimed_meta,
-//         initial_unclaimed + AMOUNT,
-//         "contract.total_unclaimed_meta not correct"
-//     );
-// }
+fn get_context2(predecessor_account_id: AccountId) -> VMContextBuilder {
+    let mut builder = VMContextBuilder::new();
+    builder
+        .current_account_id(accounts(0))
+        .signer_account_id(predecessor_account_id.clone())
+        .predecessor_account_id(predecessor_account_id);
+    builder
+}
 
-// /// For stNear Claims
-// fn internal_distribute_300_stnear_for_claims(contract: &mut StakingPositionContract, users: &Vec<User>) {
-//     let sender_id: AccountId = operator_account();
-//     let initial_accumulated_distributed = contract.accum_distributed_stnear_for_claims;
-//     let initial_unclaimed = contract.total_unclaimed_stnear;
-//     const AMOUNT: u128 = 3000040 * E20; // 300.0040
-//     let mut msg = String::from("for-claims:");
-//     msg.push_str(
-//         &serde_json::to_string(&vec![
-//             (users[0].account_id().to_string(), 1500010),  // 150.0010
-//             (users[1].account_id().to_string(), 0500012),  // 50.0012
-//             (users[2].account_id().to_string(), 0800008), // 80.0008
-//             (users[3].account_id().to_string(), 0200010), // 20.0010
-//         ])
-//         .unwrap(),
-//     );
+/// For Claims NEAR
+fn internal_distribute_100_near_for_claims(contract: &mut StakingPositionContract, users: &Vec<User>) {
+    let sender_id: AccountId = operator_account();
+    let initial_accumulated_distributed = contract.accum_near_distributed_for_claims;
+    let initial_unclaimed = contract.total_unclaimed_near;
+    const AMOUNT: u128 = 100 * E24;
+    let distribute_info = vec![
+        (users[0].account_id(), U128::from(10_u128 * E24)),
+        (users[1].account_id(), U128::from(20_u128 * E24)),
+        (users[2].account_id(), U128::from(40_u128 * E24)),
+        (users[3].account_id(), U128::from(30_u128 * E24)),
+    ];
 
-//     set_context_caller(&meta_pool_account());
-//     contract.ft_on_transfer(sender_id.clone(), AMOUNT.into(), msg);
-//     assert_eq!(
-//         contract.accum_distributed_stnear_for_claims,
-//         initial_accumulated_distributed + AMOUNT,
-//         "accum_distributed_stnear_for_claims not correct"
-//     );
-//     assert_eq!(
-//         contract.total_unclaimed_stnear,
-//         initial_unclaimed + AMOUNT,
-//         "contract.total_unclaimed_stnear not correct"
-//     );
-// }
+    let mut context = get_context2(sender_id);
+    testing_env!(context
+        .attached_deposit(AMOUNT)
+        .build()
+    );
+    contract.deposit_claimable_near(distribute_info);
+    assert_eq!(
+        contract.accum_near_distributed_for_claims,
+        initial_accumulated_distributed + AMOUNT,
+        "accum_near_distributed_for_claims not correct"
+    );
+    assert_eq!(
+        contract.total_unclaimed_near,
+        initial_unclaimed + AMOUNT,
+        "contract.total_unclaimed_near not correct"
+    );
+}
 
-// #[test]
-// fn test_deposit_for_claims() {
-//     let (mut contract, users) = internal_prepare_multi_voter_contract();
-//     let _ = internal_distribute_100_meta_for_claims(&mut contract, &users);
-//     let _ = internal_distribute_300_stnear_for_claims(&mut contract, &users);
-// }
+/// For USDC Claims
+fn internal_distribute_300_usdc_for_claims(contract: &mut StakingPositionContract, users: &Vec<User>) {
+    let sender_id: AccountId = operator_account();
+    let initial_accumulated_distributed = contract.get_accum_ft_distributed_for_claims(&usdc_token_account()).0;
+    let initial_unclaimed = contract.get_total_unclaimed_ft(&usdc_token_account()).0;
+    const AMOUNT: u128 = 3000040 * 100; // 300.0040
+    let mut msg = String::from("for-claims:02");
+    msg.push_str(
+        &serde_json::to_string(&vec![
+            (users[0].account_id().to_string(), 1500010),  // 150.0010
+            (users[1].account_id().to_string(), 0500012),  // 50.0012
+            (users[2].account_id().to_string(), 0800008), // 80.0008
+            (users[3].account_id().to_string(), 0200010), // 20.0010
+        ])
+        .unwrap(),
+    );
+
+    let mut context = get_context2(sender_id.clone());
+    testing_env!(context
+        .predecessor_account_id(usdc_token_account())
+        .attached_deposit(AMOUNT)
+        .build()
+    );
+    contract.ft_on_transfer(sender_id.clone(), AMOUNT.into(), msg);
+    // contract.ft_on_transfer(sender_id.clone(), AMOUNT.into(), msg);
+    assert_eq!(
+        contract.get_accum_ft_distributed_for_claims(&usdc_token_account()).0,
+        initial_accumulated_distributed + AMOUNT,
+        "get_accum_ft_distributed_for_claims not correct"
+    );
+    assert_eq!(
+        contract.get_total_unclaimed_ft(&usdc_token_account()).0,
+        initial_unclaimed + AMOUNT,
+        "contract.total_unclaimed_stnear not correct"
+    );
+}
+
+#[test]
+fn test_deposit_for_claims() {
+    let (mut contract, users) = internal_prepare_multi_voter_contract();
+    let _ = internal_distribute_100_near_for_claims(&mut contract, &users);
+    let _ = internal_distribute_300_usdc_for_claims(&mut contract, &users);
+}
 
 // #[test]
 // #[should_panic(

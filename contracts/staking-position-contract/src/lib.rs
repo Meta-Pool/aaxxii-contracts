@@ -643,9 +643,9 @@ impl StakingPositionContract {
         self.internal_decrease_total_votes(votes, &contract_address, &votable_object_id);
     }
 
-    /**********************/
-    /*   View functions   */
-    /**********************/
+    /******************************/
+    /*   View functions (Voting)  */
+    /******************************/
 
     pub fn get_owner_id(&self) -> String {
         self.owner_id.to_string()
@@ -684,39 +684,6 @@ impl StakingPositionContract {
         let staker = self.internal_get_staker(account_id);
         let balance = staker.balance + staker.sum_unlocked();
         U128::from(balance)
-    }
-
-    pub fn get_claimable_near(&self, account_id: AccountId) -> U128 {
-        U128::from(self.claimable_near.get(&account_id).unwrap_or(0))
-    }
-
-    pub fn get_claimable_ft(
-        &self,
-        staker_id: AccountId,
-        token_address: AccountId
-    ) -> U128 {
-        U128::from(
-            self.claimable_ft.get(&token_address)
-                .expect("Invalid ft token")
-                .owners
-                .get(&staker_id)
-                .unwrap_or(0)
-        )
-    }
-
-    // get all claims
-    // TODO: We need an ft get all claims?
-    pub fn get_near_claims(&self, from_index: u32, limit: u32) -> Vec<(AccountId, U128)> {
-        let mut results = Vec::<(AccountId, U128)>::new();
-        let keys = self.claimable_near.keys_as_vector();
-        let start = from_index as u64;
-        let limit = limit as u64;
-        for index in start..std::cmp::min(start + limit, keys.len()) {
-            let voter_id = keys.get(index).unwrap();
-            let amount = self.claimable_near.get(&voter_id).unwrap();
-            results.push((voter_id, amount.into()));
-        }
-        results
     }
 
     pub fn get_locked_balance(&self, account_id: AccountId) -> U128 {
@@ -838,17 +805,84 @@ impl StakingPositionContract {
         U128::from(votes)
     }
 
-    // Get current NEAR ready for distribution.
-    pub fn get_total_unclaimed_meta(&self) -> U128 {
-        U128::from(self.total_unclaimed_near)
+    /*****************************/
+    /*   View functions (Claim)  */
+    /*****************************/
+
+    pub fn get_claimable_near(&self, account_id: &AccountId) -> U128 {
+        U128::from(self.claimable_near.get(account_id).unwrap_or(0))
     }
 
-    // pub fn get_accumulated_distributed_for_claims(&self) -> U128 {
-    //     // TODO!! <-----------------
-    //     U128::from(0)
+    pub fn get_claimable_near_list(
+        &self,
+        from_index: u32,
+        limit: u32
+    ) -> Vec<(AccountId, U128)> {
+        let mut results = Vec::<(AccountId, U128)>::new();
+        let keys = self.claimable_near.keys_as_vector();
+        let start = from_index as u64;
+        let limit = limit as u64;
+        for index in start..std::cmp::min(start + limit, keys.len()) {
+            let account_id = keys.get(index).unwrap();
+            let amount = self.get_claimable_near(&account_id);
+            results.push((account_id, amount));
+        }
+        results
+    }
 
-    //     // self..into()
-    // }
+    pub fn get_claimable_ft(
+        &self,
+        account_id: &AccountId,
+        token_address: &AccountId
+    ) -> U128 {
+        self.claimable_ft.get(token_address)
+            .expect("Invalid ft token")
+            .owners
+            .get(account_id)
+            .unwrap_or(0)
+            .into()
+    }
+
+    pub fn get_claimable_ft_list(
+        &self,
+        from_index: u32,
+        limit: u32,
+        token_address: &AccountId
+    ) -> Vec<(AccountId, U128)> {
+        let mut results = Vec::<(AccountId, U128)>::new();
+        let keys = self.claimable_near.keys_as_vector();
+        let start = from_index as u64;
+        let limit = limit as u64;
+        for index in start..std::cmp::min(start + limit, keys.len()) {
+            let account_id = keys.get(index).unwrap();
+            let amount = self.get_claimable_ft(&account_id, token_address);
+            results.push((account_id, amount));
+        }
+        results
+    }
+
+    // Get current NEAR ready for distribution.
+    pub fn get_total_unclaimed_near(&self) -> U128 {
+        self.total_unclaimed_near.into()
+    }
+
+    pub fn get_accum_near_distributed_for_claims(&self) -> U128 {
+        self.accum_near_distributed_for_claims.into()
+    }
+
+    pub fn get_total_unclaimed_ft(&self, token_address: &AccountId) -> U128 {
+        self.claimable_ft.get(token_address)
+            .expect("Invalid ft token")
+            .total_unclaimed_ft
+            .into()
+    }
+
+    pub fn get_accum_ft_distributed_for_claims(&self, token_address: &AccountId) -> U128 {
+        self.claimable_ft.get(token_address)
+            .expect("Invalid ft token")
+            .accum_ft_distributed_for_claims
+            .into()
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
