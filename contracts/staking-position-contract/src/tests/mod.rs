@@ -1161,178 +1161,182 @@ fn test_deposit_for_claims() {
     let _ = internal_distribute_300_usdc_for_claims(&mut contract, &users);
 }
 
-// #[test]
-// #[should_panic(
-//     expected = "total to distribute 101000000000000000000000000 != total_amount sent 100000000000000000000000000"
-// )]
-// fn distribute_too_much_meta() {
-//     let (mut contract, users) = internal_prepare_multi_voter_contract();
-//     set_context_caller(&owner_account());
-//     let amount = 100 * E24;
-//     let mut msg = String::from("for-claims:");
-//     msg.push_str(
-//         &serde_json::to_string(&vec![
-//             (users[0].account_id().to_string(), 10),
-//             (users[1].account_id().to_string(), 20),
-//             (users[2].account_id().to_string(), 40),
-//             (users[3].account_id().to_string(), 31),
-//         ])
-//         .unwrap(),
-//     );
-//     set_context_caller(&underlying_token_account());
-//     contract.ft_on_transfer(operator_account(), amount.into(), msg);
-// }
+#[test]
+#[should_panic(
+    expected = "total to distribute 101000000000000000000000000 != total_amount sent 100000000000000000000000000"
+)]
+fn distribute_too_much_near() {
+    let (mut contract, users) = internal_prepare_multi_voter_contract();
+    let sender_id: AccountId = operator_account();
+    const AMOUNT: u128 = 100 * E24;
+    let distribute_info = vec![
+        (users[0].account_id(), U128::from(10_u128 * E24)),
+        (users[1].account_id(), U128::from(20_u128 * E24)),
+        (users[2].account_id(), U128::from(40_u128 * E24)),
+        (users[3].account_id(), U128::from(31_u128 * E24)),
+    ];
 
-// #[test]
-// #[should_panic(
-//     expected = "total to distribute 300012900000000000000000000 != total_amount sent 300003000000000000000000000"
-// )]
-// fn distribute_too_much_stnear() {
-//     let (mut contract, users) = internal_prepare_multi_voter_contract();
-//     set_context_caller(&owner_account());
-//     const AMOUNT: u128 = 3000030 * E20; // 300.0030
-//     let mut msg = String::from("for-claims:");
-//     msg.push_str(
-//         &serde_json::to_string(&vec![
-//             (users[0].account_id().to_string(), 1500010),  // 150.0010
-//             (users[1].account_id().to_string(), 0500012),  // 50.0012
-//             (users[2].account_id().to_string(), 0800008), // 80.0008
-//             (users[3].account_id().to_string(), 0200099), // 20.0099 too much
-//         ])
-//         .unwrap(),
-//     );
-//     set_context_caller(&meta_pool_account());
-//     contract.ft_on_transfer(operator_account(), AMOUNT.into(), msg);
-// }
+    let mut context = get_context2(sender_id);
+    testing_env!(context
+        .attached_deposit(AMOUNT)
+        .build()
+    );
+    contract.deposit_claimable_near(distribute_info);
+}
 
-// fn prepare_contract_with_claims() -> (StakingPositionContract, Vec<User>) {
-//     let (mut contract, users) = internal_prepare_multi_voter_contract();
-//     internal_distribute_100_meta_for_claims(&mut contract, &users);
-//     internal_distribute_300_stnear_for_claims(&mut contract, &users);
-//     (contract, users)
-// }
-// #[test]
-// fn test_distribute_claims() {
-//     prepare_contract_with_claims();
-// }
+#[test]
+#[should_panic(
+    expected = "total to distribute 300012900 != total_amount sent 300003000"
+)]
+fn distribute_too_much_usdc() {
+    let (mut contract, users) = internal_prepare_multi_voter_contract();
+    set_context_caller(&owner_account());
+    const AMOUNT: u128 = 3000030 * 100; // 300.0030
+    let mut msg = String::from("for-claims:02");
+    msg.push_str(
+        &serde_json::to_string(&vec![
+            (users[0].account_id().to_string(), 1500010),  // 150.0010
+            (users[1].account_id().to_string(), 0500012),  // 50.0012
+            (users[2].account_id().to_string(), 0800008), // 80.0008
+            (users[3].account_id().to_string(), 0200099), // 20.0099 too much
+        ])
+        .unwrap(),
+    );
+    set_context_caller(&usdc_token_account());
+    contract.ft_on_transfer(operator_account(), AMOUNT.into(), msg);
+}
 
-// #[test]
-// #[should_panic(expected = "you don't have enough claimable META")]
-// fn test_claim_too_much_meta() {
-//     let (mut contract, users) = prepare_contract_with_claims();
-//     set_context_caller(&users[2].account_id());
-//     contract.claim_and_lock((41 * E24).into(), 30);
-// }
+fn prepare_contract_with_claims() -> (StakingPositionContract, Vec<User>) {
+    let (mut contract, users) = internal_prepare_multi_voter_contract();
+    internal_distribute_100_near_for_claims(&mut contract, &users);
+    internal_distribute_300_usdc_for_claims(&mut contract, &users);
+    (contract, users)
+}
 
-// #[test]
-// #[should_panic(expected = "you don't have enough claimable stNEAR")]
-// fn test_claim_too_much_stnear() {
-//     let (mut contract, users) = prepare_contract_with_claims();
-//     set_context_caller(&users[2].account_id());
-//     contract.claim_stnear((81 * E24).into());
-// }
+#[test]
+fn test_distribute_claims() {
+    prepare_contract_with_claims();
+}
 
-// #[test]
-// fn test_claim_meta() {
-//     let (mut contract, users) = prepare_contract_with_claims();
+#[test]
+#[should_panic(expected = "You do not have enough claimable NEAR.")]
+fn test_claim_too_much_meta() {
+    let (mut contract, users) = prepare_contract_with_claims();
+    set_context_caller(&users[2].account_id());
+    contract.claim_near((41 * E24).into());
+}
 
-//     // total claim
-//     {
-//         let unclaimed_pre = contract.total_unclaimed_meta;
-//         let caller = users[2].account_id();
-//         // let user_record_pre = contract.get_voter_info(&caller);
-//         // println!("{:?}", user_record_pre);
-//         set_context_caller(&caller);
-//         let claim_balance_pre = contract.get_claimable_meta(&caller).0;
-//         let claim_amount = 40 * E24;
-//         let duration = 165;
-//         contract.claim_and_lock(claim_amount.into(), duration);
-//         assert_eq!(
-//             contract.total_unclaimed_meta,
-//             unclaimed_pre - claim_amount,
-//             "total_unclaimed_meta"
-//         );
-//         let claim_balance_post = contract.get_claimable_meta(&caller).0;
-//         assert_eq!(
-//             claim_balance_post,
-//             claim_balance_pre.saturating_sub(claim_amount)
-//         );
-//         let user_record_post = contract.get_voter_info(&caller);
-//         // println!("{:?}", user_record_post);
-//         assert_eq!(user_record_post.locking_positions.len(), 2);
-//         let pos = &user_record_post.locking_positions[1];
-//         assert_eq!(pos.locking_period, duration);
-//         assert_eq!(pos.is_unlocked, false);
-//         assert_eq!(pos.is_unlocking, false);
-//         assert_eq!(pos.voting_power.0, claim_amount * 3);
-//     }
+#[test]
+#[should_panic(expected = "You do not have enough claimable FT.")]
+fn test_claim_too_much_usdc() {
+    let (mut contract, users) = prepare_contract_with_claims();
+    set_context_caller(&users[2].account_id());
+    contract.claim_ft((81 * E24).into(), usdc_token_account());
+}
 
-//     // partial claim
-//     {
-//         let unclaimed_pre = contract.total_unclaimed_meta;
-//         let caller = users[1].account_id();
-//         // let user_record_pre = contract.get_voter_info(&caller);
-//         // println!("{:?}", user_record_pre);
-//         set_context_caller(&caller);
-//         let claim_balance_pre = contract.get_claimable_meta(&caller).0;
-//         let claim_amount = 6 * E24;
-//         contract.claim_and_lock(claim_amount.into(), 30);
-//         assert_eq!(
-//             contract.total_unclaimed_meta,
-//             unclaimed_pre - claim_amount,
-//             "total_unclaimed_meta"
-//         );
-//         // let user_record_post = contract.get_voter_info(&caller);
-//         // println!("{:?}", user_record_post);
-//         let claim_balance_post = contract.get_claimable_meta(&caller).0;
-//         assert_eq!(claim_balance_post, claim_balance_pre - claim_amount);
-//     }
-// }
+#[test]
+fn test_claim_near() {
+    let (mut contract, users) = prepare_contract_with_claims();
 
-// #[test]
-// fn test_claim_stnear() {
-//     let (mut contract, users) = prepare_contract_with_claims();
+    // total claim
+    {
+        let unclaimed_pre = contract.get_total_unclaimed_near().0;
+        let caller = users[2].account_id();
+        // let user_record_pre = contract.get_voter_info(&caller);
+        // println!("{:?}", user_record_pre);
+        set_context_caller(&caller);
+        let claim_balance_pre = contract.get_claimable_near(&caller).0;
+        let claim_amount = 40 * E24;
+        // let duration = 165;
+        contract.claim_near(claim_amount.into());
+        assert_eq!(
+            contract.get_total_unclaimed_near().0,
+            unclaimed_pre - claim_amount,
+            "total_unclaimed_near"
+        );
+        let claim_balance_post = contract.get_claimable_near(&caller).0;
+        assert_eq!(
+            claim_balance_post,
+            claim_balance_pre.saturating_sub(claim_amount)
+        );
+        // IMPORTANT: The NEAR is not re-staked.
+        // let user_record_post = contract.get_staker_info(caller.clone());
+        // // println!("{:?}", user_record_post);
+        // assert_eq!(user_record_post.locking_positions.len(), 1);
+        // let pos = &user_record_post.locking_positions[1];
+        // assert_eq!(pos.locking_period, duration);
+        // assert_eq!(pos.is_unlocked, false);
+        // assert_eq!(pos.is_unlocking, false);
+        // assert_eq!(pos.voting_power.0, claim_amount * 3);
+    }
 
-//     // total claim
-//     {
-//         let unclaimed_pre = contract.total_unclaimed_stnear;
-//         let caller = users[2].account_id();
-//         // let user_record_pre = contract.get_voter_info(&caller);
-//         // println!("{:?}", user_record_pre);
-//         set_context_caller(&caller);
-//         let claim_balance_pre = contract.get_claimable_stnear(&caller).0;
-//         let claim_amount = 800008 * E20;
-//         contract.claim_stnear(claim_amount.into());
-//         assert_eq!(
-//             contract.total_unclaimed_stnear,
-//             unclaimed_pre - claim_amount,
-//             "total_unclaimed_stnear"
-//         );
-//         let claim_balance_post = contract.get_claimable_stnear(&caller).0;
-//         assert_eq!(
-//             claim_balance_post,
-//             claim_balance_pre.saturating_sub(claim_amount)
-//         );
-//     }
+    // partial claim
+    {
+        let unclaimed_pre = contract.get_total_unclaimed_near().0;
+        let caller = users[1].account_id();
+        // let user_record_pre = contract.get_voter_info(&caller);
+        // println!("{:?}", user_record_pre);
+        set_context_caller(&caller);
+        let claim_balance_pre = contract.get_claimable_near(&caller).0;
+        let claim_amount = 6 * E24;
+        contract.claim_near(claim_amount.into());
+        assert_eq!(
+            contract.get_total_unclaimed_near().0,
+            unclaimed_pre - claim_amount,
+            "total_unclaimed_near"
+        );
+        // let user_record_post = contract.get_voter_info(&caller);
+        // println!("{:?}", user_record_post);
+        let claim_balance_post = contract.get_claimable_near(&caller).0;
+        assert_eq!(claim_balance_post, claim_balance_pre - claim_amount);
+    }
+}
 
-//     // partial claim
-//     {
-//         let unclaimed_pre = contract.total_unclaimed_stnear;
-//         let caller = users[1].account_id();
-//         // let user_record_pre = contract.get_voter_info(&caller);
-//         // println!("{:?}", user_record_pre);
-//         set_context_caller(&caller);
-//         let claim_balance_pre = contract.get_claimable_stnear(&caller).0;
-//         let claim_amount = 50 * E24;
-//         contract.claim_stnear(claim_amount.into());
-//         assert_eq!(
-//             contract.total_unclaimed_stnear,
-//             unclaimed_pre - claim_amount,
-//             "total_unclaimed_stnear"
-//         );
-//         // let user_record_post = contract.get_voter_info(&caller);
-//         // println!("{:?}", user_record_post);
-//         let claim_balance_post = contract.get_claimable_stnear(&caller).0;
-//         assert_eq!(claim_balance_post, claim_balance_pre - claim_amount);
-//     }
-// }
+#[test]
+fn test_claim_usdc() {
+    let (mut contract, users) = prepare_contract_with_claims();
+
+    // total claim
+    {
+        let unclaimed_pre = contract.get_total_unclaimed_ft(&usdc_token_account()).0;
+        let caller = users[2].account_id();
+        // let user_record_pre = contract.get_voter_info(&caller);
+        // println!("{:?}", user_record_pre);
+        set_context_caller(&caller);
+        let claim_balance_pre = contract.get_claimable_ft(&caller, &usdc_token_account()).0;
+
+        let claim_amount = 800008 * 100;
+        contract.claim_ft(claim_amount.into(), usdc_token_account());
+        assert_eq!(
+            contract.get_total_unclaimed_ft(&usdc_token_account()).0,
+            unclaimed_pre - claim_amount,
+            "total_unclaimed_usdc"
+        );
+        let claim_balance_post = contract.get_claimable_ft(&caller, &usdc_token_account()).0;
+        assert_eq!(
+            claim_balance_post,
+            claim_balance_pre.saturating_sub(claim_amount)
+        );
+    }
+
+    // partial claim
+    {
+        let unclaimed_pre = contract.get_total_unclaimed_ft(&usdc_token_account()).0;
+        let caller = users[1].account_id();
+        // let user_record_pre = contract.get_voter_info(&caller);
+        // println!("{:?}", user_record_pre);
+        set_context_caller(&caller);
+        let claim_balance_pre = contract.get_claimable_ft(&caller, &usdc_token_account()).0;
+        let claim_amount = 50 * 100;
+        contract.claim_ft(claim_amount.into(), usdc_token_account());
+        assert_eq!(
+            contract.get_total_unclaimed_ft(&usdc_token_account()).0,
+            unclaimed_pre - claim_amount,
+            "total_unclaimed_stnear"
+        );
+        // let user_record_post = contract.get_voter_info(&caller);
+        // println!("{:?}", user_record_post);
+        let claim_balance_post = contract.get_claimable_ft(&caller, &usdc_token_account()).0;
+        assert_eq!(claim_balance_post, claim_balance_pre - claim_amount);
+    }
+}

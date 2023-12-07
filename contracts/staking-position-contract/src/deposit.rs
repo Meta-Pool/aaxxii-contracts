@@ -54,8 +54,8 @@ impl FungibleTokenReceiver for StakingPositionContract {
 
 impl StakingPositionContract {
     fn assert_total_distributed(amount: u128, target: u128) {
-        assert_eq!(target, amount, "total to distribute {} != total_amount sent {}",
-            target, amount
+        assert_eq!(amount, target, "total to distribute {} != total_amount sent {}",
+            amount, target
         );
     }
 

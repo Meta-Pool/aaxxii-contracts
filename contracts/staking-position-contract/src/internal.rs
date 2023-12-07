@@ -141,7 +141,7 @@ impl StakingPositionContract {
         };
 
         // keep contract total
-        self.total_unclaimed_near -= amount;
+        details.total_unclaimed_ft -= amount;
 
         self.claimable_ft.insert(token_address, &details);
     }
