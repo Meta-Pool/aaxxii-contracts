@@ -13,8 +13,14 @@ build:
 dev-deploy: build
 	./scripts/dev-deploy.sh
 
+dev-re-deploy:
+	./scripts/dev-re-deploy.sh
+
 dev-create-sale:
 	./scripts/dev-create-sale.sh
+
+dev-distribute-rewards:
+	./scripts/dev-distribute-rewards.sh
 
 test:
 	RUST_BACKTRACE=1 cargo test -- --color always --nocapture

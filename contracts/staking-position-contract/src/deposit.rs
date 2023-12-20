@@ -14,6 +14,7 @@ impl FungibleTokenReceiver for StakingPositionContract {
     ) -> PromiseOrValue<U128> {
         let amount = amount.0;
 
+        // "for-claims:20..." <- Expect multiplier in `msg`.
         // deposit for-claims, msg == "for-claims" means tokens to be later distributed to voters
         if msg.len() >= 11 && &msg[..11] == "for-claims:" {
 

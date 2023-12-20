@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+NEAR_ACCOUNT="kate_tester3.testnet"
+BUYER_ACCOUNT="jomsox.testnet"
+YOCTO_UNITS="000000000000000000000000"
+USDC_UNITS="000000"
+TOTAL_PREPAID_GAS=300000000000000
+
+# Re-Deploy
+STAKING_CONTRACT_ADDRESS="dev-1701718093376-11844838355640"
+NEAR_ENV=testnet near deploy --wasmFile res/staking_position_contract.wasm --accountId $STAKING_CONTRACT_ADDRESS
