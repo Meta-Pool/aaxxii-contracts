@@ -145,9 +145,11 @@ impl StakingPositionContract {
     // ****************
 
     #[payable]
+    /// For $NEAR, amount includes 4 decimals, so 51234 => 5.1234 NEAR.
+    /// Note how `distribute_info` has a u128 number.
     pub fn deposit_claimable_near(
         &mut self,
-        distribute_info: Vec<(AccountId, U128)>
+        distribute_info: Vec<(AccountId, u128)>
     ) {
         let total_amount = env::attached_deposit();
         require!(total_amount > 0, "Zero NEAR deposit.");

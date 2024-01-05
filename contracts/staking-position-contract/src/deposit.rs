@@ -87,12 +87,12 @@ impl StakingPositionContract {
     pub(crate) fn distribute_near_claims(
         &mut self,
         total_amount: u128,
-        distribute_info: Vec<(AccountId, U128)>
+        distribute_info: Vec<(AccountId, u128)>
     ) {
         let mut total_distributed = 0;
 
         for (owner, amount) in distribute_info {
-            let amount = amount.0;
+            let amount = amount * 10u128.pow(20);
             self.add_claimable_near(&owner, amount);
             total_distributed += amount;
         }

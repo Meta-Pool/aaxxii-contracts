@@ -7,7 +7,7 @@ use near_sdk::testing_env;
 mod utils;
 use utils::*;
 
-const E20: u128 = 100_000_000_000_000_000_000;
+// const E20: u128 = 100_000_000_000_000_000_000;
 
 fn new_staking_contract() -> StakingPositionContract {
     StakingPositionContract::new(
@@ -1093,10 +1093,10 @@ fn internal_distribute_100_near_for_claims(contract: &mut StakingPositionContrac
     let initial_unclaimed = contract.total_unclaimed_near;
     const AMOUNT: u128 = 100 * E24;
     let distribute_info = vec![
-        (users[0].account_id(), U128::from(10_u128 * E24)),
-        (users[1].account_id(), U128::from(20_u128 * E24)),
-        (users[2].account_id(), U128::from(40_u128 * E24)),
-        (users[3].account_id(), U128::from(30_u128 * E24)),
+        (users[0].account_id(), 100000_u128), // 10.00 NEAR
+        (users[1].account_id(), 200000_u128), // 20.00 NEAR
+        (users[2].account_id(), 400000_u128), // 30.00 NEAR
+        (users[3].account_id(), 300000_u128), // 40.00 NEAR
     ];
 
     let mut context = get_context2(sender_id);
@@ -1170,10 +1170,10 @@ fn distribute_too_much_near() {
     let sender_id: AccountId = operator_account();
     const AMOUNT: u128 = 100 * E24;
     let distribute_info = vec![
-        (users[0].account_id(), U128::from(10_u128 * E24)),
-        (users[1].account_id(), U128::from(20_u128 * E24)),
-        (users[2].account_id(), U128::from(40_u128 * E24)),
-        (users[3].account_id(), U128::from(31_u128 * E24)),
+        (users[0].account_id(), 100000_u128), // 10.00 NEAR
+        (users[1].account_id(), 200000_u128), // 20.00 NEAR
+        (users[2].account_id(), 400000_u128), // 40.00 NEAR
+        (users[3].account_id(), 310000_u128), // 31.00 NEAR
     ];
 
     let mut context = get_context2(sender_id);
