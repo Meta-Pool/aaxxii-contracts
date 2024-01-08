@@ -13,7 +13,7 @@ build:
 dev-deploy: build
 	./scripts/dev-deploy.sh
 
-dev-re-deploy:
+dev-re-deploy: build
 	./scripts/dev-re-deploy.sh
 
 dev-create-sale:
