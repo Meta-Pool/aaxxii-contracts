@@ -22,6 +22,9 @@ dev-create-sale:
 dev-distribute-rewards:
 	./scripts/dev-distribute-rewards.sh
 
+dev-transfer-aaxxii:
+	./scripts/dev-transfer-aaxxii.sh
+
 test:
 	RUST_BACKTRACE=1 cargo test -- --color always --nocapture
 
