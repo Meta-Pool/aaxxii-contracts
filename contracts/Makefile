@@ -13,6 +13,9 @@ build:
 dev-deploy: build
 	./scripts/dev-deploy.sh
 
+deploy: build
+	./scripts/deploy.sh
+
 dev-re-deploy: build
 	./scripts/dev-re-deploy.sh
 

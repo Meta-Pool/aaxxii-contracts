@@ -20,3 +20,4 @@ contracts/neardev_ptoken/
 contracts/neardev_usdc/
 
 contracts/neardev_*/
+.DS_Store
