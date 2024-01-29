@@ -115,6 +115,13 @@ impl StakingPositionContract {
         self.max_locking_period = max_locking_period;
     }
 
+    #[payable]
+    pub fn update_min_deposit_amount(&mut self, new_value: U128) {
+        assert_one_yocto();
+        self.assert_only_owner();
+        self.min_deposit_amount = new_value.0;
+    }
+
     // *********
     // * claim *
     // *********
