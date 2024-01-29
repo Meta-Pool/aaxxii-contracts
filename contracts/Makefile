@@ -19,6 +19,9 @@ deploy: build
 dev-re-deploy: build
 	./scripts/dev-re-deploy.sh
 
+re-deploy: build
+	./scripts/re-deploy.sh
+
 dev-create-sale:
 	./scripts/dev-create-sale.sh
 
