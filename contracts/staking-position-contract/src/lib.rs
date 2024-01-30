@@ -329,12 +329,10 @@ impl StakingPositionContract {
         self.deposit_locking_position(amount, locking_period, &mut staker);
     }
 
-    // TODO: here you can unify the amount from position and from balance.
     pub fn relock_partial_position(
         &mut self,
         index: PositionIndex,
         amount_from_position: U128,
-        // amount: U128,
         locking_period: Days,
         amount_from_balance: U128,
     ) {
@@ -390,6 +388,10 @@ impl StakingPositionContract {
             assert!(new_amount > 0, "Use relock_position() function instead.");
 
             locking_position.amount = new_amount;
+            locking_position.voting_power = self.calculate_voting_power(
+                new_amount,
+                locking_position.locking_period
+            );
             staker.locking_positions.replace(index as u64, &locking_position);
         } else {
             staker.balance += locking_position.amount - amount_from_position;
