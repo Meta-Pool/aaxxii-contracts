@@ -11,6 +11,7 @@ overflow-checks = true
 members = [
 	"katherine-sale-contract",
 	"staking-position-contract",
+	"proposals-contract",
 	"test-p-token",
 	"test-utils"
 ]

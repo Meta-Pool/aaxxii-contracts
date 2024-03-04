@@ -1,26 +1,10 @@
-// #![allow(unused_imports)]
-// #![allow(unused_variables)]
-// #![allow(dead_code)]
-
 use near_sdk::{
-    // testing_env,
     AccountId,
     // Balance, Gas, MockedBlockchain, PromiseResult, PublicKey, VMContext,
 };
 
 use crate::constants::NEAR;
 use crate::types::*;
-
-// pub const LOCKUP_NEAR: u128 = 1000;
-// pub const GENESIS_TIME_IN_DAYS: u64 = 500;
-// pub const YEAR: u64 = 365;
-// pub const TEST_INITIAL_BALANCE: u128 = 100;
-
-// // pub const MIN_LOCKING_PERIOD: Days = 30;
-// // pub const MAX_LOCKING_PERIOD: Days = 300;
-// // pub const MIN_DEPOSIT_AMOUNT: Balance = 1 * NEAR;
-// pub const MAX_LOCKING_POSITIONS: u8 = 20;
-// pub const MAX_VOTING_POSITIONS: u8 = 100;
 
 pub const USDT_UNIT: u128 = 1_000_000;
 pub const MIN_DEPOSIT_AMOUNT_IN_NEAR: u128 = 1 * NEAR;
@@ -35,61 +19,13 @@ pub fn sold_token_contract() -> AccountId {
     AccountId::new_unchecked("sold.katherine.near".to_string())
 }
 
-
-
-
-
-// pub fn system_account() -> AccountId {
-//     AccountId::new_unchecked("system.metavote.near".to_string())
-// }
-
-// pub fn contract_account() -> AccountId {
-//     AccountId::new_unchecked("contract.metavote.near".to_string())
-// }
-
 pub fn treasury_account() -> AccountId {
-    AccountId::new_unchecked("treasury.metavote.near".to_string())
+    AccountId::new_unchecked("treasury.katherine.near".to_string())
 }
 
 pub fn owner_account() -> AccountId {
-    AccountId::new_unchecked("owner.metavote.near".to_string())
+    AccountId::new_unchecked("owner.katherine.near".to_string())
 }
-
-// pub fn non_owner() -> AccountId {
-//     AccountId::new_unchecked("non_owner.metavote.near".to_string())
-// }
-
-// pub fn developer_account() -> AccountId {
-//     AccountId::new_unchecked("developer.metavote.near".to_string())
-// }
-
-// pub fn operator_account() -> AccountId {
-//     AccountId::new_unchecked("operator.metavote.near".to_string())
-// }
-
-// pub fn meta_token_account() -> AccountId {
-//     AccountId::new_unchecked("meta-token.metavote.near".to_string())
-// }
-
-// pub fn meta_pool_account() -> AccountId {
-//     AccountId::new_unchecked("meta-pool.metavote.near".to_string())
-// }
-
-// pub fn voter_account() -> AccountId {
-//     AccountId::new_unchecked("voter.metavote.near".to_string())
-// }
-
-// pub fn voter_account_id(id: u8) -> AccountId {
-//     AccountId::new_unchecked(format!("voter_acc_{}.near", id))
-// }
-
-// pub fn compose_account(suffix: &str) -> AccountId {
-//     AccountId::new_unchecked(format!("account_{}.near", suffix))
-// }
-
-// pub fn votable_account() -> AccountId {
-//     AccountId::new_unchecked("votable.metavote.near".to_string())
-// }
 
 // pub fn ntoy(near_amount: u128) -> u128 {
 //     return near_amount * 10u128.pow(24);

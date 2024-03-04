@@ -20,8 +20,8 @@ pub trait FungibleTokenCore {
 }
 
 #[ext_contract(ext_self)]
-pub trait SelfMetaVote {
-    fn after_transfer_meta_callback(
+pub trait SelfStakingPosition {
+    fn after_transfer_asset_callback(
         &mut self,
         voter_id: AccountId,
         amount: U128

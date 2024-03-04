@@ -2,7 +2,7 @@
 name = "test-p-token"
 version = "0.1.0"
 edition = "2021"
-authors = ["Narwallets.com <hello@narwallets.com>"]
+authors = ["Meta Pool <hello@metapool.app>"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

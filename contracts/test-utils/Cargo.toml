@@ -2,7 +2,7 @@
 name = "test-utils"
 version = "0.4.4"
 edition = "2021"
-authors = ["Narwallets.com <hello@narwallets.com>"]
+authors = ["Meta Pool <hello@metapool.app>"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
