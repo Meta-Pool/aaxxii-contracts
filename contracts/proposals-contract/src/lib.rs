@@ -212,9 +212,9 @@ impl ProposalsContract {
         self.proposals.insert(&proposal_id, &proposal);
     }
 
-    // *********
+    // *******************************
     // * Proposal creators functions *
-    // *********
+    // *******************************
 
     #[payable]
     pub fn create_proposal(
@@ -226,7 +226,8 @@ impl ProposalsContract {
         extra: String,
     ) {
         self.assert_open_for_new_proposals();
-        self.assert_proposal_storage_is_covered();
+        // self.assert_proposal_storage_is_covered();
+        self.assert_only_operator();
         ext_proposal_vote::ext(self.staking_position_contract_address.clone())
             .with_static_gas(GAS_FOR_GET_VOTING_POWER)
             .with_attached_deposit(1)

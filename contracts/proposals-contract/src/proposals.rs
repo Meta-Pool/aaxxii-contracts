@@ -21,7 +21,6 @@ pub struct ProposalJSON {
     pub title: String,
     pub short_description: String,
     pub body: String,
-    // pub comments: String,
     pub data: String,
     pub extra: String,
     pub creator_id: AccountId,
@@ -30,7 +29,7 @@ pub struct ProposalJSON {
     pub draft: bool,
     pub executed: bool,
     pub canceled: bool,
-    v_power_quorum_to_reach: Option<U128>
+    pub v_power_quorum_to_reach: Option<U128>
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize)]
@@ -62,11 +61,11 @@ impl Proposal {
     ) -> Self {
         Proposal {
             proposal_id: id,
-            title: title,
-            short_description: short_description,
-            body: body,
-            data: data,
-            extra: extra,
+            title,
+            short_description,
+            body,
+            data,
+            extra,
             creator_id: env::signer_account_id(),
             vote_end_timestamp: None,
             vote_start_timestamp: None,
@@ -82,12 +81,12 @@ impl Proposal {
             Some(quorum_to_reach) => Some(U128::from(quorum_to_reach)),
             None => None,
         };
+
         ProposalJSON {
             proposal_id: self.proposal_id.clone(),
             title: self.title.clone(),
             body: self.body.clone(),
             short_description: self.short_description.clone(),
-            // comments: self.comments.clone(),
             data: self.data.clone(),
             extra: self.extra.clone(),
             creator_id: self.creator_id.clone(),

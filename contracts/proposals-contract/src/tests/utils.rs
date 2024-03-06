@@ -19,47 +19,47 @@ pub const MAX_LOCKING_POSITIONS: u8 = 20;
 pub const MAX_VOTING_POSITIONS: u8 = 100;
 
 pub fn system_account() -> AccountId {
-    AccountId::new_unchecked("system.metavote.near".to_string())
+    AccountId::new_unchecked("system.proposals.near".to_string())
 }
 
 pub fn contract_account() -> AccountId {
-    AccountId::new_unchecked("contract.metavote.near".to_string())
+    AccountId::new_unchecked("contract.proposals.near".to_string())
 }
 
 pub fn treasury_account() -> AccountId {
-    AccountId::new_unchecked("treasury.metavote.near".to_string())
+    AccountId::new_unchecked("treasury.proposals.near".to_string())
 }
 
 pub fn owner_account() -> AccountId {
-    AccountId::new_unchecked("owner.metavote.near".to_string())
+    AccountId::new_unchecked("owner.proposals.near".to_string())
 }
 
 pub fn non_owner() -> AccountId {
-    AccountId::new_unchecked("non_owner.metavote.near".to_string())
+    AccountId::new_unchecked("non_owner.proposals.near".to_string())
 }
 
 pub fn developer_account() -> AccountId {
-    AccountId::new_unchecked("developer.metavote.near".to_string())
+    AccountId::new_unchecked("developer.proposals.near".to_string())
 }
 
 pub fn operator_account() -> AccountId {
-    AccountId::new_unchecked("operator.metavote.near".to_string())
+    AccountId::new_unchecked("operator.proposals.near".to_string())
 }
 
 pub fn meta_token_account() -> AccountId {
-    AccountId::new_unchecked("meta-token.metavote.near".to_string())
+    AccountId::new_unchecked("meta-token.proposals.near".to_string())
 }
 
 pub fn voter_account() -> AccountId {
-    AccountId::new_unchecked("voter.metavote.near".to_string())
+    AccountId::new_unchecked("voter.proposals.near".to_string())
 }
 
 pub fn multi_voter_account(id: String) -> AccountId {
-    AccountId::new_unchecked(format!("voter_{}.metavote.near", id))
+    AccountId::new_unchecked(format!("voter_{}.proposals.near", id))
 }
 
 pub fn votable_account() -> AccountId {
-    AccountId::new_unchecked("votable.metavote.near".to_string())
+    AccountId::new_unchecked("votable.proposals.near".to_string())
 }
 
 pub fn ntoy(near_amount: u128) -> u128 {
