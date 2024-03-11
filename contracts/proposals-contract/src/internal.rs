@@ -222,11 +222,11 @@ impl ProposalsContract {
             .unwrap_or(Vec::<ProposalId>::new())
     }
 
-    pub(crate) fn assert_proposal_storage_is_covered(&self) {
-        assert!(
-            env::attached_deposit() >= self.proposal_storage_near,
-            "The required NEAR to create a proposal is {}",
-            self.proposal_storage_near
-        );
-    }
+    // pub(crate) fn assert_proposal_storage_is_covered(&self) {
+    //     assert!(
+    //         env::attached_deposit() >= self.proposal_storage_near,
+    //         "The required NEAR to create a proposal is {}",
+    //         self.proposal_storage_near
+    //     );
+    // }
 }

@@ -2,7 +2,7 @@ use crate::constants::*;
 use crate::interface::*;
 use proposals::{Proposal, ProposalJSON, ProposalState};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{unordered_map::UnorderedMap, LookupSet};
+use near_sdk::collections::{unordered_map::UnorderedMap, UnorderedSet};
 use near_sdk::json_types::U128;
 use near_sdk::json_types::U64;
 use near_sdk::{env, log, near_bindgen, require, AccountId, Balance, PanicOnDefault, Promise};
@@ -26,7 +26,7 @@ mod voter;
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct ProposalsContract {
     pub admin_id: AccountId,
-    pub operator_ids: LookupSet<AccountId>,
+    pub operator_ids: UnorderedSet<AccountId>,
     pub asset_token_contract_address: ContractAddress,
     pub staking_position_contract_address: ContractAddress,
     pub proposals: UnorderedMap<ProposalId, Proposal>,
@@ -75,7 +75,7 @@ impl ProposalsContract {
 
         let mut contract = Self {
             admin_id,
-            operator_ids: LookupSet::new(StorageKey::Operators),
+            operator_ids: UnorderedSet::new(StorageKey::Operators),
             asset_token_contract_address,
             staking_position_contract_address,
             proposals: UnorderedMap::new(StorageKey::Proposals),
@@ -290,6 +290,10 @@ impl ProposalsContract {
     // ******************
     // * View functions *
     // ******************
+
+    pub fn get_admin(&self) -> &AccountId { &self.admin_id }
+
+    pub fn get_operators(&self) -> Vec<AccountId> { self.operator_ids.to_vec() }
 
     /// Check proposal threshold:
     /// if account has the minimum Voting Power to participate in Governance.

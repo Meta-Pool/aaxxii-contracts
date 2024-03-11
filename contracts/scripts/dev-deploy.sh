@@ -60,34 +60,36 @@ rm -rf neardev_proposals/
 AAXXII_CONTRACT_ADDRESS='dev-1701718056213-45735667916226'
 STAKING_CONTRACT_ADDRESS='dev-1701718093376-11844838355640'
 
-# NEAR_ENV=testnet near deploy meta-proposals.testnet res/proposals_contract.wasm \
-#     --initFunction new \
-#     --initArgs '{"admin_id": "'$NEAR_ACCOUNT'", "operator_ids": ["'$OPERATOR_ADDRESS'"], "asset_token_contract_address": "'$AAXXII_CONTRACT_ADDRESS'", "staking_position_contract_address": "'$STAKING_CONTRACT_ADDRESS'", "voting_period":"'$VOTING_PERIOD_MS'", "min_voting_power_amount": "'$MIN_VOTING_POWER_AMOUNT'", "proposal_storage_near": "'$PROPOSAL_STORAGE_NEAR'", "quorum_floor": '$QUORUM_FLOOR' }' \
-# # mv neardev/ neardev_proposals/
+# near create-account v010.meta-proposals.testnet --useAccount meta-proposals.testnet --initialBalance 2
 
-# PROPOSALS_CONTRACT_ADDRESS=$(head -n1 ./neardev_proposals/dev-account)
-PROPOSALS_CONTRACT_ADDRESS="meta-proposals.testnet"
+NEAR_ENV=testnet near deploy v010.meta-proposals.testnet res/proposals_contract.wasm \
+    --initFunction new \
+    --initArgs '{"admin_id": "'$NEAR_ACCOUNT'", "operator_ids": ["'$OPERATOR_ADDRESS'"], "asset_token_contract_address": "'$AAXXII_CONTRACT_ADDRESS'", "staking_position_contract_address": "'$STAKING_CONTRACT_ADDRESS'", "voting_period":"'$VOTING_PERIOD_MS'", "min_voting_power_amount": "'$MIN_VOTING_POWER_AMOUNT'", "proposal_storage_near": "'$PROPOSAL_STORAGE_NEAR'", "quorum_floor": '$QUORUM_FLOOR' }' \
+# mv neardev/ neardev_proposals/
 
-echo "Sold Token -: "$PTOKEN_CONTRACT_ADDRESS
-echo "USDC Token -: "$USDC_CONTRACT_ADDRESS
-echo "AAXXII Token: "$AAXXII_CONTRACT_ADDRESS
-echo "Sales ------: "$KATHERINE_CONTRACT_ADDRESS
-echo "Staking ----: "$STAKING_CONTRACT_ADDRESS
-echo "Proposals --: "$PROPOSALS_CONTRACT_ADDRESS
-echo "Owner ------: "$NEAR_ACCOUNT
+# # PROPOSALS_CONTRACT_ADDRESS=$(head -n1 ./neardev_proposals/dev-account)
+# PROPOSALS_CONTRACT_ADDRESS="meta-proposals.testnet"
 
-echo "------------------ Registering accounts"
-# NEAR_ENV=testnet near call $USDC_CONTRACT_ADDRESS register_account '{"account_id": "'$BUYER_ACCOUNT'"}' --accountId $NEAR_ACCOUNT
-# NEAR_ENV=testnet near call $USDC_CONTRACT_ADDRESS register_account '{"account_id": "'$KATHERINE_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
-# NEAR_ENV=testnet near call $USDC_CONTRACT_ADDRESS register_account '{"account_id": "'$STAKING_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
-# NEAR_ENV=testnet near call $USDC_CONTRACT_ADDRESS register_account '{"account_id": "'$PROPOSALS_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
-#
-# NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$BUYER_ACCOUNT'"}' --accountId $NEAR_ACCOUNT
-# NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$KATHERINE_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
-# NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$STAKING_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
-# NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$PROPOSALS_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
-#
-# NEAR_ENV=testnet near call $AAXXII_CONTRACT_ADDRESS register_account '{"account_id": "'$BUYER_ACCOUNT'"}' --accountId $NEAR_ACCOUNT
-# NEAR_ENV=testnet near call $AAXXII_CONTRACT_ADDRESS register_account '{"account_id": "'$KATHERINE_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
-# NEAR_ENV=testnet near call $AAXXII_CONTRACT_ADDRESS register_account '{"account_id": "'$STAKING_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
-NEAR_ENV=testnet near call $AAXXII_CONTRACT_ADDRESS register_account '{"account_id": "'$PROPOSALS_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
+# echo "Sold Token -: "$PTOKEN_CONTRACT_ADDRESS
+# echo "USDC Token -: "$USDC_CONTRACT_ADDRESS
+# echo "AAXXII Token: "$AAXXII_CONTRACT_ADDRESS
+# echo "Sales ------: "$KATHERINE_CONTRACT_ADDRESS
+# echo "Staking ----: "$STAKING_CONTRACT_ADDRESS
+# echo "Proposals --: "$PROPOSALS_CONTRACT_ADDRESS
+# echo "Owner ------: "$NEAR_ACCOUNT
+
+# echo "------------------ Registering accounts"
+# # NEAR_ENV=testnet near call $USDC_CONTRACT_ADDRESS register_account '{"account_id": "'$BUYER_ACCOUNT'"}' --accountId $NEAR_ACCOUNT
+# # NEAR_ENV=testnet near call $USDC_CONTRACT_ADDRESS register_account '{"account_id": "'$KATHERINE_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
+# # NEAR_ENV=testnet near call $USDC_CONTRACT_ADDRESS register_account '{"account_id": "'$STAKING_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
+# # NEAR_ENV=testnet near call $USDC_CONTRACT_ADDRESS register_account '{"account_id": "'$PROPOSALS_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
+# #
+# # NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$BUYER_ACCOUNT'"}' --accountId $NEAR_ACCOUNT
+# # NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$KATHERINE_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
+# # NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$STAKING_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
+# # NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS register_account '{"account_id": "'$PROPOSALS_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
+# #
+# # NEAR_ENV=testnet near call $AAXXII_CONTRACT_ADDRESS register_account '{"account_id": "'$BUYER_ACCOUNT'"}' --accountId $NEAR_ACCOUNT
+# # NEAR_ENV=testnet near call $AAXXII_CONTRACT_ADDRESS register_account '{"account_id": "'$KATHERINE_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
+# # NEAR_ENV=testnet near call $AAXXII_CONTRACT_ADDRESS register_account '{"account_id": "'$STAKING_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
+# NEAR_ENV=testnet near call $AAXXII_CONTRACT_ADDRESS register_account '{"account_id": "'$PROPOSALS_CONTRACT_ADDRESS'"}' --accountId $NEAR_ACCOUNT
