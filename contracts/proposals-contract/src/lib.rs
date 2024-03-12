@@ -377,6 +377,10 @@ impl ProposalsContract {
         self.internal_proposal_is_active_or_draft(proposal_id)
     }
 
+    pub fn get_staking_position_contract_address(&self) -> &AccountId {
+        &self.staking_position_contract_address
+    }
+
     // *******************
     // * Voter functions *
     // *******************
