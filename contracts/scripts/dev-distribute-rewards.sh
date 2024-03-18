@@ -41,7 +41,7 @@ echo "*************************************"
 #     --gas $TOTAL_PREPAID_GAS \
 #     --depositYocto 1
 
-NEAR_ENV=testnet near call $PTOKEN_CONTRACT_ADDRESS ft_transfer_call \
+NEAR_ENV=testnet near call $USDC_CONTRACT_ADDRESS ft_transfer_call \
     '{"receiver_id": "'$STAKING_CONTRACT_ADDRESS'", "amount": "13'$USDC_UNITS'", "memo": null, "msg": "for-claims:02[[\"aaxxiitestnet.testnet\", 130000]]"}' \
     --accountId $NEAR_ACCOUNT \
     --gas $TOTAL_PREPAID_GAS \
